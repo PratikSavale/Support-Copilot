@@ -1,0 +1,49 @@
+from functools import lru_cache
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    APP_NAME: str = "AI L2 Support Copilot"
+    APP_VERSION: str = "1.0.0"
+    DEBUG: bool = False
+
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/copilot"
+    DATABASE_POOL_SIZE: int = 10
+    DATABASE_MAX_OVERFLOW: int = 20
+    DATABASE_POOL_PRE_PING: bool = True
+
+    REDIS_URL: str = "redis://localhost:6379/0"
+
+    GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-2.0-flash"
+    GEMINI_EMBEDDING_MODEL: str = "text-embedding-004"
+
+    JIRA_URL: str = ""
+    JIRA_EMAIL: str = ""
+    JIRA_API_TOKEN: str = ""
+    JIRA_PROJECT_KEY: str = "SUP"
+
+    CHROMA_HOST: str = "localhost"
+    CHROMA_PORT: int = 8000
+    CHROMA_COLLECTION: str = "knowledge_chunks"
+
+    # Keep as plain string to avoid pydantic-settings trying JSON decode before custom validators.
+    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:8000"
+
+    def cors_origins_list(self) -> list[str]:
+        raw = (self.CORS_ORIGINS or "").strip()
+        if not raw:
+            return ["http://localhost:3000", "http://localhost:8000"]
+        return [part.strip() for part in raw.split(",") if part.strip()]
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()
