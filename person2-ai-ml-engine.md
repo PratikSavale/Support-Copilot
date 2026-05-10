@@ -33,14 +33,14 @@ Build the AI/ML core of the system including Google Gemini API integration, embe
 
 Create the following structure under `/backend/ai`:
 
-```
 backend/ai/
 ├── __init__.py
-├── llm_engine.py          # Google Gemini LLM interface
-├── embedding_engine.py    # Embedding generation
-├── rag_pipeline.py        # RAG chain implementation
-├── prompts.py             # System prompts
-└── utils.py               # AI utilities
+├── llm_engine.py          # Gemini LLM interface + singleton
+├── embedding_engine.py    # Embedding generation + singleton
+├── rag_pipeline.py        # RAG search + generate pipeline + singleton
+├── prompts.py             # All system prompts
+├── chroma_utils.py        # ChromaDB client factory (shared)
+└── utils.py               # Completeness heuristic + text helpers
 ```
 
 ### 2.2 Google Gemini API Integration
@@ -52,11 +52,15 @@ backend/ai/
 Google Gemini LLM Engine
 Handles all LLM inference through Gemini API.
 """
-import os
-from typing import List, Dict, Any, Optional
+import json
+from typing import Any, AsyncIterator
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+
 from config.settings import get_settings
+
+_llm_instance: "LLMEngine | None" = None
 
 class LLMEngine:
     """Engine for Google Gemini LLM inference."""
@@ -70,55 +74,71 @@ class LLMEngine:
             max_tokens=1024,
         )
     
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=10),
+           retry=retry_if_exception_type(Exception), reraise=True)
     async def generate_response(
         self,
-        messages: List[Dict[str, str]],
-        system_prompt: Optional[str] = None,
+        messages: list[dict],
+        system_prompt: str | None = None,
     ) -> str:
-        """
-        Generate a response from the LLM.
-        
-        Args:
-            messages: List of {role, content} dicts
-            system_prompt: Optional system prompt
-            
-        Returns:
-            Generated response string
-        """
-        langchain_messages = []
-        
+        """Generate response. Auto-retries 3x on Gemini API failures."""
+        lc: list = []
         if system_prompt:
-            langchain_messages.append(SystemMessage(content=system_prompt))
-        
-        for msg in messages:
-            if msg["role"] == "user":
-                langchain_messages.append(HumanMessage(content=msg["content"]))
-            elif msg["role"] == "assistant":
-                langchain_messages.append(AIMessage(content=msg["content"]))
-            elif msg["role"] == "system":
-                langchain_messages.append(SystemMessage(content=msg["content"]))
-        
-        response = await self.model.ainvoke(langchain_messages)
-        return response.content
-    
+            lc.append(SystemMessage(content=system_prompt))
+        for m in messages:
+            role, content = m["role"], m["content"]
+            if role == "user":
+                lc.append(HumanMessage(content=content))
+            elif role == "assistant":
+                lc.append(AIMessage(content=content))
+            else:
+                lc.append(SystemMessage(content=content))
+        resp = await self.model.ainvoke(lc)
+        return resp.content
+
+    async def generate_response_stream(
+        self,
+        messages: list[dict],
+        system_prompt: str | None = None,
+    ) -> AsyncIterator[str]:
+        """[ENHANCEMENT] Stream tokens — Person 4's WebSocket handler consumes this."""
+        lc: list = []
+        if system_prompt:
+            lc.append(SystemMessage(content=system_prompt))
+        for m in messages:
+            role, content = m["role"], m["content"]
+            if role == "user":
+                lc.append(HumanMessage(content=content))
+            elif role == "assistant":
+                lc.append(AIMessage(content=content))
+            else:
+                lc.append(SystemMessage(content=content))
+        async for chunk in self.model.astream(lc):
+            if chunk.content:
+                yield chunk.content
+
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=10),
+           retry=retry_if_exception_type(Exception), reraise=True)
     async def generate_structured_response(
         self,
         prompt: str,
-        response_format: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        schema_hint: str = "",
+    ) -> dict[str, Any]:
+        """[FIX] Implemented — returns parsed JSON dict for ticket extraction (Person 3).
+
+        Falls back to {} on JSON parse failure. Pass schema_hint to guide the model.
         """
-        Generate a structured response using Gemini function calling.
-        
-        Args:
-            prompt: The prompt to send
-            response_format: Expected JSON schema
-            
-        Returns:
-            Parsed JSON response
-        """
-        # Use Gemini's function calling capability
-        # This is useful for ticket creation, confidence evaluation, etc.
-        pass
+        full_prompt = (
+            f"{prompt}\n\n"
+            f"Respond with valid JSON ONLY — no markdown, no explanation.\n"
+            f"Expected fields: {schema_hint}"
+        )
+        raw = await self.generate_response([{"role": "user", "content": full_prompt}])
+        cleaned = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        try:
+            return json.loads(cleaned)
+        except json.JSONDecodeError:
+            return {}
     
     async def evaluate_relevance(
         self,
@@ -157,6 +177,14 @@ class LLMEngine:
             return max(1, min(5, score)) / 5.0  # Normalize to 0-1
         except ValueError:
             return 0.5  # Default to neutral if parsing fails
+
+
+def get_llm_engine() -> LLMEngine:
+    """[ENHANCEMENT] Module-level singleton — avoids re-creating the model per request."""
+    global _llm_instance
+    if _llm_instance is None:
+        _llm_instance = LLMEngine()
+    return _llm_instance
 ```
 
 ### 2.3 Embedding Engine
@@ -168,10 +196,11 @@ class LLMEngine:
 Embedding Engine
 Handles text embedding generation using Gemini Embedding API.
 """
-import os
-from typing import List
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
+
 from config.settings import get_settings
+
+_emb_instance: "EmbeddingEngine | None" = None
 
 class EmbeddingEngine:
     """Engine for generating text embeddings."""
@@ -208,11 +237,16 @@ class EmbeddingEngine:
         return await self.embeddings.aembed_documents(documents)
     
     def get_embedding_dimension(self) -> int:
-        """
-        Returns the dimension of the embedding vectors.
-        For text-embedding-004, this is 768.
-        """
+        """Returns 768 — fixed dimension for text-embedding-004."""
         return 768
+
+
+def get_embedding_engine() -> EmbeddingEngine:
+    """[ENHANCEMENT] Module-level singleton."""
+    global _emb_instance
+    if _emb_instance is None:
+        _emb_instance = EmbeddingEngine()
+    return _emb_instance
 ```
 
 ### 2.4 Text Splitter
@@ -224,7 +258,7 @@ class EmbeddingEngine:
 Text Splitter Utility
 Handles document chunking for RAG pipeline.
 """
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter  # [FIX] separate pkg in LangChain 0.2+
 from typing import List
 
 class TextSplitter:
@@ -373,17 +407,15 @@ Keep questions concise and specific.
 RAG (Retrieval-Augmented Generation) Pipeline
 Orchestrates retrieval from ChromaDB and generation with Gemini.
 """
-import os
-from typing import List, Dict, Any, Optional, Tuple
-from langchain.chains import RetrievalQA
-from langchain.prompts import PromptTemplate
-from langchain.schema.document import Document
+from typing import Any
 
-from ai.embedding_engine import EmbeddingEngine
-from ai.llm_engine import LLMEngine
+from config.settings import get_settings           # [FIX] was missing
+from ai.embedding_engine import get_embedding_engine
+from ai.llm_engine import get_llm_engine
+from ai.chroma_utils import get_chroma_client, get_collection  # [FIX] use factory
 from ai.prompts import CHAT_SYSTEM_PROMPT
-from utils.text_splitter import TextSplitter
-import chromadb
+
+_rag_instance: "RAGEngine | None" = None
 
 class RAGEngine:
     """
@@ -391,27 +423,13 @@ class RAGEngine:
     Combines retrieval from ChromaDB with generation from Gemini.
     """
     
-    def __init__(
-        self,
-        collection_name: str = "knowledge_chunks",
-        top_k: int = 5,
-    ):
-        self.embedding_engine = EmbeddingEngine()
-        self.llm_engine = LLMEngine()
-        self.text_splitter = TextSplitter()
+    def __init__(self, top_k: int = 5) -> None:
+        s = get_settings()
         self.top_k = top_k
-        self.collection_name = collection_name
-        
-        # Initialize ChromaDB client
-        settings = get_settings()
-        self.chroma_client = chromadb.HttpClient(
-            host=settings.CHROMA_HOST,
-            port=settings.CHROMA_PORT,
-        )
-        self.collection = self.chroma_client.get_or_create_collection(
-            name=collection_name,
-            metadata={"hnsw:space": "cosine"},
-        )
+        self.embedding_engine = get_embedding_engine()  # singleton
+        self.llm_engine = get_llm_engine()              # singleton
+        client = get_chroma_client()
+        self.collection = get_collection(client, s.CHROMA_COLLECTION)
     
     async def add_documents(
         self,
@@ -567,24 +585,31 @@ class RAGEngine:
         
         if not context_docs:
             return {
-                "response": "I couldn't find any relevant information in the knowledge base. I'll create a support ticket for your issue.",
+                "response": "I couldn't find relevant information in the knowledge base.",
                 "sources": [],
                 "action": "escalated",
-                "confidence": 0.0,
+                "retrieval_score": 0.0,
+                "retrieved_chunks": [],   # [ENHANCEMENT] Person 3 uses these for completeness score
             }
-        
-        # Step 2: Generate response
-        response, sources = await self.generate_response(query, context_docs)
-        
-        # Calculate average similarity as confidence proxy
+
         avg_similarity = sum(doc["similarity"] for doc in context_docs) / len(context_docs)
-        
+        response, sources = await self.generate_response(query, context_docs)
+
         return {
             "response": response,
             "sources": sources,
             "action": "resolve",
-            "confidence": avg_similarity,
+            "retrieval_score": avg_similarity,             # [ENHANCEMENT] feeds confidence engine
+            "retrieved_chunks": [d["content"] for d in context_docs],  # [ENHANCEMENT] feeds completeness check
         }
+
+
+def get_rag_engine() -> "RAGEngine":
+    """[ENHANCEMENT] Module-level singleton."""
+    global _rag_instance
+    if _rag_instance is None:
+        _rag_instance = RAGEngine()
+    return _rag_instance
 ```
 
 ### 2.7 ChromaDB Integration Utilities
@@ -631,32 +656,78 @@ def get_collection_stats(collection) -> dict:
     }
 ```
 
-### 2.8 Requirements Update
+### 2.8 AI Utilities (Completeness Heuristic)
+
+**File:** `backend/ai/utils.py`
+
+> [ENHANCEMENT] Used by Person 3's confidence engine to compute the `completeness_score` component.
+
+```python
+"""AI utilities — completeness heuristic for confidence scoring."""
+import re
+
+_ERROR_PATTERNS = re.compile(r"(error|err_|exception|traceback|\d{3,})", re.I)
+_STEP_PATTERNS = re.compile(r"(step \d|\d+\.\s|first|then|finally|navigate|click|run|execute)", re.I)
+_RESOLUTION_PATTERNS = re.compile(r"(solution|resolve|fix|workaround|restart|reinstall|update|configure)", re.I)
+
+
+def compute_completeness_score(chunks: list[str]) -> float:
+    """Heuristic: does retrieved content contain error codes, steps, and resolution keywords?
+
+    Returns 0.0–1.0. Person 3 uses this as the third factor in the confidence formula:
+        confidence = 0.40 * retrieval_score + 0.35 * relevance_score + 0.25 * completeness_score
+    """
+    if not chunks:
+        return 0.0
+    combined = " ".join(chunks)
+    has_errors = bool(_ERROR_PATTERNS.search(combined))
+    has_steps = bool(_STEP_PATTERNS.search(combined))
+    has_resolution = bool(_RESOLUTION_PATTERNS.search(combined))
+    score = (has_errors + has_steps + has_resolution) / 3.0
+    return round(score, 4)
+
+
+def truncate_excerpt(text: str, max_chars: int = 200) -> str:
+    """Return a clean excerpt for the `chunk_excerpt` field in API responses."""
+    return text[:max_chars].rstrip() + "..." if len(text) > max_chars else text
+```
+
+---
+
+### 2.9 Requirements Update
 
 Add these to `backend/requirements.txt` if not already present:
 
 ```
-langchain==0.1.9
-langchain-google-genai==0.0.6
-langchain-community==0.0.21
-google-generativeai==0.5.2
-chromadb==0.4.24
+# AI/ML core
+langchain>=0.2.0
+langchain-core>=0.2.0
+langchain-google-genai>=1.0.0
+langchain-community>=0.2.0
+langchain-text-splitters>=0.2.0    # [FIX] separate package in LangChain 0.2+
+google-generativeai>=0.7.0
+tenacity>=8.2.3                    # [FIX] retry logic — was missing
+
+# Vector Database
+chromadb>=0.5.0
 ```
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] `LLMEngine` can generate responses via Gemini API
-- [ ] `EmbeddingEngine` can generate embeddings for text
-- [ ] `TextSplitter` correctly splits documents into chunks (500 tokens, 100 overlap)
-- [ ] `RAGEngine` can add documents to ChromaDB
-- [ ] `RAGEngine` can search ChromaDB and return relevant results
-- [ ] `RAGEngine.process_query()` returns formatted response with sources
-- [ ] System prompts are defined and produce appropriate outputs
-- [ ] ChromaDB connection works with Docker Compose
-- [ ] All async functions properly use `await`
-- [ ] Error handling for API failures (rate limits, network issues)
+- [ ] `LLMEngine.generate_response()` works with retry on rate-limit errors
+- [ ] `LLMEngine.generate_response_stream()` yields tokens (for WebSocket)
+- [ ] `LLMEngine.generate_structured_response()` returns parsed JSON dict
+- [ ] `EmbeddingEngine` generates 768-dim embeddings
+- [ ] `TextSplitter` splits into chunks (500 chars, 100 overlap)
+- [ ] `RAGEngine.add_documents()` stores chunks in ChromaDB
+- [ ] `RAGEngine.search()` returns results with `similarity` scores
+- [ ] `RAGEngine.process_query()` returns `retrieval_score` + `retrieved_chunks`
+- [ ] `compute_completeness_score()` in `ai/utils.py` returns 0.0–1.0
+- [ ] All singletons (`get_llm_engine`, `get_embedding_engine`, `get_rag_engine`) work
+- [ ] ChromaDB HttpClient connects to Docker Compose service
+- [ ] All async functions use `await` correctly
 
 ---
 
@@ -665,17 +736,18 @@ chromadb==0.4.24
 Implement retry logic with exponential backoff for Gemini API calls:
 
 ```python
-import asyncio
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
+# Applied as a decorator on LLMEngine methods (see llm_engine.py)
 @retry(
     stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=2, max=10),
+    wait=wait_exponential(min=2, max=10),
     retry=retry_if_exception_type(Exception),
+    reraise=True,   # re-raise after all retries exhausted
 )
-async def call_gemini_api(prompt):
-    # API call here
-    pass
+async def call_gemini_api(prompt: str) -> str:
+    # pattern used on generate_response / generate_structured_response
+    ...
 ```
 
 ---
