@@ -7,14 +7,25 @@ Validates:
 3) search returns similarity
 4) process_query returns response/sources/retrieval_score/retrieved_chunks
 
-Run:
+Run (from backend directory):
     python scripts/person2_e2e_smoke.py
+
+Or (recommended — no path issues):
+    python -m scripts.person2_e2e_smoke
 """
 
 from __future__ import annotations
 
 import asyncio
+import os
+import sys
 import uuid
+from pathlib import Path
+
+# Ensure `ai`, `config`, etc. resolve when this file lives under `scripts/`.
+_BACKEND_ROOT = Path(__file__).resolve().parent.parent
+if str(_BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(_BACKEND_ROOT))
 
 from ai.chroma_utils import get_chroma_client, reset_collection
 from ai.rag_pipeline import get_rag_engine
@@ -44,6 +55,11 @@ async def main() -> None:
     print(f"Search results: {len(search_rows)}")
     if not search_rows:
         raise RuntimeError("search() returned zero rows")
+
+    if os.getenv("PERSON2_SKIP_LLM", "").lower() in {"1", "true", "yes"}:
+        print("Skipping process_query because PERSON2_SKIP_LLM is enabled.")
+        print("Person2 retrieval smoke: PASS")
+        return
 
     result = await rag.process_query("How to fix ERR_TIMEOUT?")
     print("process_query keys:", sorted(result.keys()))

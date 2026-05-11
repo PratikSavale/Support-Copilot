@@ -27,6 +27,7 @@ class LLMEngine:
         self.model = ChatGoogleGenerativeAI(
             model=settings.GEMINI_MODEL,
             google_api_key=settings.GEMINI_API_KEY,
+            convert_system_message_to_human=True,
             temperature=0.3,
             max_tokens=1024,
         )
