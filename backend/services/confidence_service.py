@@ -30,8 +30,8 @@ class ConfidenceService:
     """Calculates confidence scores and decides the next action."""
 
     # Thresholds
-    LOW_THRESHOLD = 0.40
-    HIGH_THRESHOLD = 0.75
+    LOW_THRESHOLD = 0.20
+    HIGH_THRESHOLD = 0.60
 
     # Weight factors
     W_RETRIEVAL = 0.40

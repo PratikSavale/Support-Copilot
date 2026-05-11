@@ -248,6 +248,11 @@ class ChatService:
                 ticket=None,
             )
 
+        # ── 7. Fallback → escalate ──────────────────────────────────────
+        return await self._escalate(
+            db, session_id, user_message, history, "high"
+        )
+
     async def stream_message(
         self,
         db: AsyncSession,
