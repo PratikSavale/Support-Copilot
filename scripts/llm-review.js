@@ -18,6 +18,8 @@ async function runCodeReview() {
   const baseBranch = process.env.BASE_BRANCH || "main";
   const headBranch = process.env.HEAD_BRANCH || "feature";
   const changedFiles = process.env.CHANGED_FILES || "";
+  const isDiffTruncated = diff.length >= 30000;
+  const isFilesTruncated = changedFiles.split("\n").filter(Boolean).length >= 30;
 
   if (!diff.trim()) {
     console.log("No diff found, skipping review.");
@@ -148,6 +150,8 @@ Respond ONLY with the JSON review object.`;
     : "COMMENT";
   review.comments = (review.comments || []).slice(0, 10);
 
+  review.isTruncated = isDiffTruncated || isFilesTruncated;
+
   fs.writeFileSync("/tmp/review_output.json", JSON.stringify(review, null, 2));
   console.log(`Review complete. Score: ${review.overallScore}/10, Recommendation: ${review.recommendation}`);
   console.log(`Found ${review.comments.length} comment(s).`);
@@ -162,5 +166,5 @@ runCodeReview().catch((err) => {
     recommendation: "COMMENT",
   };
   fs.writeFileSync("/tmp/review_output.json", JSON.stringify(fallback));
-  process.exit(0);
+  process.exit(1);
 });

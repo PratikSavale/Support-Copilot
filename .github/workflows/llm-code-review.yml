@@ -28,6 +28,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: 'npm'
 
       - name: Install dependencies
         run: npm install @google/generative-ai
@@ -88,6 +89,8 @@ jobs:
               ``,
               `### Summary`,
               summary,
+              ``,
+              review.isTruncated ? `> [!WARNING]\n> **Partial Review**: The PR diff or file list was truncated due to size limits. Some changes may not have been reviewed.` : '',
               ``,
               comments.length > 0 ? `### Findings (${comments.length})` : '',
               comments.map(c => [
