@@ -34,38 +34,24 @@ async function runCodeReview() {
   const systemInstruction = `You are an expert code reviewer with deep knowledge of software engineering best practices, security, performance, and maintainability. Your job is to review pull request diffs and provide actionable, constructive feedback.
 
 Review focus areas (in order of priority):
-1. **Security vulnerabilities** – SQL injection, XSS, auth issues, secrets in code, etc.
-2. **Bugs & correctness** – Logic errors, off-by-one, null/undefined handling, race conditions
-3. **Performance** – N+1 queries, unnecessary computation, memory leaks
-4. **Code quality** – Readability, naming, duplication, complexity
-5. **Testing** – Missing test coverage for critical paths
-6. **Best practices** – Language/framework idioms, SOLID principles
+1. **Security vulnerabilities** - SQL injection, XSS, auth issues, secrets in code, etc.
+2. **Bugs & correctness** - Logic errors, off-by-one, null/undefined handling, race conditions
+3. **Performance** - N+1 queries, unnecessary computation, memory leaks
+4. **Code quality** - Readability, naming, duplication, complexity
+5. **Testing** - Missing test coverage for critical paths
+6. **Best practices** - Language/framework idioms, SOLID principles
 
-Be concise and actionable. Prioritize high-severity issues. Don't nitpick style unless it significantly impacts readability.
+Be concise and actionable. Prioritize high-severity issues. Focus on correctness, security, and performance.
+Avoid excessive wordiness in descriptions. If a fix is obvious, keep the suggestion short.
 
-You MUST respond with ONLY valid JSON — no markdown fences, no preamble — in this exact schema:
-{
-  "summary": "2-4 sentence overall assessment of the PR",
-  "overallScore": <integer 1-10>,
-  "recommendation": "<APPROVE|REQUEST_CHANGES|COMMENT>",
-  "comments": [
-    {
-      "title": "Short title of the issue",
-      "severity": "<high|medium|low>",
-      "file": "path/to/file.js or null",
-      "description": "Clear explanation of the issue",
-      "suggestion": "Concrete fix or improvement (optional)"
-    }
-  ]
-}
-
+You MUST respond with a JSON object following the provided schema.
 Rules:
 - overallScore: 8-10 = good, 5-7 = needs minor fixes, 1-4 = needs major fixes
 - APPROVE if score >= 8 and no high-severity issues
 - REQUEST_CHANGES if score < 6 or any high-severity security/bug issues
 - COMMENT otherwise
-- Maximum 10 comments; focus on the most important issues
-- Omit low-severity style comments unless there are very few real issues`;
+- Maximum 8-10 comments; focus on the most important issues.
+- Omit low-severity style comments unless there are very few real issues.`;
 
   const userPrompt = `Please review this pull request:
 
@@ -88,12 +74,37 @@ Respond ONLY with the JSON review object.`;
   console.log("Calling Gemini API for code review...");
   console.log(`Diff length: ${diff.length} chars`);
 
+  const responseSchema = {
+    type: "object",
+    properties: {
+      summary: { type: "string" },
+      overallScore: { type: "integer" },
+      recommendation: { type: "string" },
+      comments: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            title: { type: "string" },
+            severity: { type: "string" },
+            file: { type: "string" },
+            description: { type: "string" },
+            suggestion: { type: "string" }
+          },
+          required: ["title", "severity", "description"]
+        }
+      }
+    },
+    required: ["summary", "overallScore", "recommendation", "comments"]
+  };
+
   const model = genAI.getGenerativeModel({
-    model: "gemini-flash-latest",
+    model: "gemini-2.5-flash",
     systemInstruction,
     generationConfig: {
       responseMimeType: "application/json",
-      maxOutputTokens: 2048,
+      responseSchema,
+      maxOutputTokens: 4096,
       temperature: 0.1,
     },
   });
