@@ -691,8 +691,8 @@ class TestAnalyticsService:
         mock_db.execute = AsyncMock(return_value=mock_result)
 
         overview = await service.get_overview(mock_db)
-        assert overview["total_queries"] == 0
-        assert overview["total_tickets"] == 0
-        assert overview["total_sessions"] == 0
-        assert overview["resolution_rate"] == 0.0
-        assert overview["escalation_rate"] == 0.0
+        assert overview.total_queries == 0
+        assert overview.total_tickets == 0
+        assert overview.total_sessions == 0
+        assert overview.resolution_rate == 0.0
+        assert overview.escalation_rate == 0.0

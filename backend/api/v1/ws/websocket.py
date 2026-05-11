@@ -7,16 +7,9 @@ import json
 import asyncio
 from datetime import datetime, timezone
 
-from services.chat_service import ChatService
-from services.confidence_service import ConfidenceService
-from services.ticket_service import TicketService
+from services.service_factory import get_chat_service
 
 router = APIRouter()
-
-# Global service instances (initialized here or in main.py)
-chat_service = ChatService()
-confidence_service = ConfidenceService()
-ticket_service = TicketService()
 
 async def message_generator(session_id: str, user_message: str):
     """
@@ -31,6 +24,7 @@ async def message_generator(session_id: str, user_message: str):
     
     try:
         # Process the message
+        chat_service = get_chat_service()
         response = await chat_service.process_message(
             db=None,  # Will be passed via WebSocket auth or db dependency
             session_id=session_id,

@@ -8,11 +8,11 @@ from schemas.analytics import (
     AnalyticsOverviewResponse,
     AnalyticsTrendsResponse,
 )
-from services.analytics_service import AnalyticsService
+from services.service_factory import get_analytics_service
 
 router = APIRouter()
 
-analytics_service = AnalyticsService()
+analytics_service = get_analytics_service()
 
 def _get_days_from_range(date_range: AnalyticsDateRange | None) -> int:
     if date_range == AnalyticsDateRange.last_30d:
