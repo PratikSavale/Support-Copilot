@@ -41,3 +41,9 @@ pytest-asyncio==0.23.3
 # Development
 black==24.1.1
 ruff==0.2.1
+
+# Analytics & Utilities (Person 4)
+slowapi>=0.1.9
+python-json-logger>=2.0.7
+prometheus-client>=0.19.0
+websockets>=12.0
