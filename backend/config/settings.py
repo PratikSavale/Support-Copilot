@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     JIRA_PROJECT_KEY: str = "SUP"
 
     CHROMA_HOST: str = "localhost"
-    CHROMA_PORT: int = 8000
+    CHROMA_PORT: int = 8001
     CHROMA_COLLECTION: str = "knowledge_chunks"
 
     # Keep as plain string to avoid pydantic-settings trying JSON decode before custom validators.

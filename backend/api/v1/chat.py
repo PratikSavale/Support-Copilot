@@ -1,15 +1,22 @@
+"""Chat API endpoints (User View)."""
+
+from __future__ import annotations
+
 from uuid import UUID
 
-from fastapi import APIRouter, Body, HTTPException, status
+from fastapi import APIRouter, HTTPException, status
 
+from api.dependencies import DbSession
 from schemas.chat import (
     ChatRequest,
     ChatResponse,
+    MessageResponse,
     SessionCreate,
     SessionDetailResponse,
     SessionListResponse,
     SessionResponse,
 )
+from services.service_factory import get_chat_service
 
 router = APIRouter()
 
@@ -18,48 +25,74 @@ router = APIRouter()
     "/sessions",
     response_model=SessionResponse,
     status_code=status.HTTP_201_CREATED,
-    responses={501: {"description": "Not implemented yet"}},
 )
 async def create_session(
-    _: SessionCreate | None = Body(default=None),
+    db: DbSession,
+    _: SessionCreate | None = None,
 ) -> SessionResponse:
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Not implemented",
-    )
+    """Create a new chat session."""
+    chat_service = get_chat_service()
+    session = await chat_service.create_session(db)
+    return SessionResponse.model_validate(session)
 
 
 @router.post(
     "/sessions/{session_id}/messages",
     response_model=ChatResponse,
-    responses={501: {"description": "Not implemented yet"}},
 )
-async def send_message(session_id: UUID, _message: ChatRequest) -> ChatResponse:
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Not implemented",
-    )
+async def send_message(
+    session_id: UUID,
+    message: ChatRequest,
+    db: DbSession,
+) -> ChatResponse:
+    """Send a user message and get an AI response."""
+    chat_service = get_chat_service()
+    try:
+        response = await chat_service.process_message(
+            db=db,
+            session_id=str(session_id),
+            user_message=message.message,
+            follow_up_responses=message.follow_up_responses,
+        )
+        return response
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        )
 
 
 @router.get(
     "/sessions",
     response_model=SessionListResponse,
-    responses={501: {"description": "Not implemented yet"}},
 )
-async def list_sessions() -> SessionListResponse:
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Not implemented",
+async def list_sessions(db: DbSession) -> SessionListResponse:
+    """List all chat sessions."""
+    chat_service = get_chat_service()
+    sessions = await chat_service.list_sessions(db)
+    return SessionListResponse(
+        sessions=[SessionResponse.model_validate(s) for s in sessions]
     )
 
 
 @router.get(
     "/sessions/{session_id}",
     response_model=SessionDetailResponse,
-    responses={501: {"description": "Not implemented yet"}},
 )
-async def get_session(session_id: UUID) -> SessionDetailResponse:
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Not implemented",
+async def get_session(session_id: UUID, db: DbSession) -> SessionDetailResponse:
+    """Get a session with its full message history."""
+    chat_service = get_chat_service()
+    session = await chat_service.get_session(db, str(session_id))
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Session {session_id} not found",
+        )
+    return SessionDetailResponse(
+        id=session.id,
+        title=session.title,
+        status=session.status,
+        created_at=session.created_at,
+        updated_at=session.updated_at,
+        messages=[MessageResponse.model_validate(m) for m in session.messages],
     )
