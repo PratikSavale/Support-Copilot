@@ -78,6 +78,13 @@ class TicketService:
                 "description": conversation_text[:2000],
             }
 
+        def _format_field(val: Any) -> str | None:
+            if val is None:
+                return None
+            if isinstance(val, list):
+                return "\n".join(str(i) for i in val)
+            return str(val)
+
         ticket = Ticket(
             session_id=session_id,
             summary=ticket_data.get("summary", query[:200]),
@@ -85,9 +92,9 @@ class TicketService:
             severity=ticket_data.get("severity", severity),
             product_module=ticket_data.get("product_module"),
             environment=ticket_data.get("environment"),
-            error_messages=ticket_data.get("error_messages"),
-            steps_to_reproduce=ticket_data.get("steps_to_reproduce"),
-            troubleshooting_attempted=ticket_data.get("troubleshooting_attempted"),
+            error_messages=_format_field(ticket_data.get("error_messages")),
+            steps_to_reproduce=_format_field(ticket_data.get("steps_to_reproduce")),
+            troubleshooting_attempted=_format_field(ticket_data.get("troubleshooting_attempted")),
             conversation_summary=ticket_data.get(
                 "conversation_summary", conversation_text[:1000]
             ),
