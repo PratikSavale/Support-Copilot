@@ -1,1 +1,1 @@
-# Services Package
+"""Core business-logic services (Person 3)."""
