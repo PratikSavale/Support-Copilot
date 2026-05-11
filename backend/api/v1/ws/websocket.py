@@ -1,16 +1,33 @@
 """
 WebSocket Handler
-Provides real-time streaming for chat responses.
+Provides real-time streaming for chat responses with robust error handling.
 """
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 import json
-import asyncio
+import logging
 from datetime import datetime, timezone
+from typing import Any
+
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from pydantic import BaseModel
 
 from config.database import async_session_factory
 from services.service_factory import get_chat_service
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+def serialize_event(event: dict[str, Any]) -> str:
+    """Helper to safely serialize events containing Pydantic models or Enums."""
+    def _convert(obj):
+        if isinstance(obj, BaseModel):
+            return obj.model_dump()
+        if hasattr(obj, "value"): # Enums
+            return obj.value
+        if isinstance(obj, (datetime, timezone)):
+            return obj.isoformat()
+        return str(obj)
+
+    return json.dumps(event, default=_convert)
 
 @router.websocket("/ws/{session_id}")
 async def websocket_chat(websocket: WebSocket, session_id: str):
@@ -23,15 +40,32 @@ async def websocket_chat(websocket: WebSocket, session_id: str):
     await websocket.accept()
     chat_service = get_chat_service()
     
-    try:
-        while True:
-            raw_message = await websocket.receive_text()
-            client_message = json.loads(raw_message)
-            
-            if client_message.get("type") == "message":
-                user_message = client_message.get("content", "")
+    # Maintain a single DB session for the duration of the connection
+    # to avoid repeated connection overhead, but manage transactions carefully.
+    async with async_session_factory() as db:
+        try:
+            while True:
+                try:
+                    raw_message = await websocket.receive_text()
+                    client_message = json.loads(raw_message)
+                except json.JSONDecodeError:
+                    await websocket.send_text(serialize_event({
+                        "type": "error",
+                        "message": "Invalid JSON format",
+                    }))
+                    continue
                 
-                async with async_session_factory() as db:
+                if client_message.get("type") == "message":
+                    user_message = client_message.get("content", "").strip()
+                    
+                    # 🟡 Validation: Ensure message is not empty
+                    if not user_message:
+                        await websocket.send_text(serialize_event({
+                            "type": "error",
+                            "message": "Message content cannot be empty",
+                        }))
+                        continue
+
                     try:
                         async for event in chat_service.stream_message(
                             db=db,
@@ -40,43 +74,30 @@ async def websocket_chat(websocket: WebSocket, session_id: str):
                         ):
                             # Add timestamp if missing
                             if "timestamp" not in event:
-                                event["timestamp"] = datetime.now(timezone.utc).isoformat()
+                                event["timestamp"] = datetime.now(timezone.utc)
                             
-                            # Handle serialization of Pydantic/Enum types
-                            if event["type"] == "final":
-                                if "action" in event and hasattr(event["action"], "value"):
-                                    event["action"] = event["action"].value
-                                if "sources" in event:
-                                    event["sources"] = [
-                                        s.model_dump() if hasattr(s, "model_dump") else s 
-                                        for s in event["sources"]
-                                    ]
-                                if "ticket" in event and event["ticket"]:
-                                    event["ticket"] = (
-                                        event["ticket"].model_dump() 
-                                        if hasattr(event["ticket"], "model_dump") 
-                                        else event["ticket"]
-                                    )
-
-                            await websocket.send_text(json.dumps(event))
+                            await websocket.send_text(serialize_event(event))
                         
+                        # Commit the transaction for this message
                         await db.commit()
                         
                     except Exception as e:
+                        logger.error(f"Error processing message in session {session_id}: {e}", exc_info=True)
                         await db.rollback()
-                        await websocket.send_text(json.dumps({
+                        await websocket.send_text(serialize_event({
                             "type": "error",
-                            "message": str(e),
-                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                            "message": f"Server error: {str(e)}",
+                            "timestamp": datetime.now(timezone.utc),
                         }))
                     
-    except WebSocketDisconnect:
-        pass
-    except Exception as e:
-        try:
-            await websocket.send_text(json.dumps({
-                "type": "error",
-                "message": str(e),
-            }))
-        except:
-            pass
+        except WebSocketDisconnect:
+            logger.info(f"WebSocket disconnected for session {session_id}")
+        except Exception as e:
+            logger.error(f"Critical WebSocket error in session {session_id}: {e}", exc_info=True)
+            try:
+                await websocket.send_text(serialize_event({
+                    "type": "error",
+                    "message": "Internal server error occurred",
+                }))
+            except:
+                pass

@@ -1,122 +1,164 @@
 import { useEffect, useRef, useCallback } from 'react'
 import { useUserStore } from '../store/userStore'
-
-const WS_BASE_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/api/v1/chat/ws'
+import { WS_BASE_URL } from '../config/api'
 
 // Singleton state to survive React re-renders and StrictMode
 let globalSocket: WebSocket | null = null
 let globalSessionId: string | null = null
+let reconnectAttempts = 0
+const MAX_RECONNECT_ATTEMPTS = 5
 
 export const useWebSocket = (sessionId: string | null) => {
   const { addMessage, updateLastMessage, setStreaming, setConnected } = useUserStore()
+  const reconnectTimeoutRef = useRef<number | null>(null)
+  const isMounted = useRef(true)
   
   // Use a ref to keep track of the current store functions (avoids stale closures)
   const storeRef = useRef({ addMessage, updateLastMessage, setStreaming, setConnected })
   useEffect(() => {
     storeRef.current = { addMessage, updateLastMessage, setStreaming, setConnected }
+    isMounted.current = true
+    return () => {
+      isMounted.current = false
+      if (reconnectTimeoutRef.current) {
+        window.clearTimeout(reconnectTimeoutRef.current)
+      }
+    }
   }, [addMessage, updateLastMessage, setStreaming, setConnected])
 
   const connect = useCallback(() => {
-    if (!sessionId) return
+    if (!sessionId || !isMounted.current) return
     
     // If we already have a socket for THIS session and it's alive, don't do anything
     if (globalSocket && globalSessionId === sessionId) {
-      if (globalSocket.readyState <= 1) return
+      if (globalSocket.readyState <= WebSocket.OPEN) return
     }
 
     // Clean up any old mismatched socket
     if (globalSocket) {
+      globalSocket.onclose = null // Remove handler to prevent loops
       globalSocket.close()
       globalSocket = null
     }
 
     console.log('🌐 [WebSocket] Connecting to:', `${WS_BASE_URL}/${sessionId}`)
     globalSessionId = sessionId
-    const ws = new WebSocket(`${WS_BASE_URL}/${sessionId}`)
-    globalSocket = ws
+    
+    try {
+      const ws = new WebSocket(`${WS_BASE_URL}/${sessionId}`)
+      globalSocket = ws
 
-    ws.onopen = () => {
-      console.log('✅ [WebSocket] Connected')
-      storeRef.current.setConnected(true)
-    }
-
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data)
-      console.log('📥 [WebSocket] Message:', data.type)
-      
-      switch (data.type) {
-        case 'start':
-          storeRef.current.setStreaming(true)
-          storeRef.current.addMessage({
-            id: Date.now().toString(),
-            role: 'assistant',
-            content: '',
-            timestamp: new Date().toISOString(),
-          })
-          break
-        
-        case 'chunk':
-          storeRef.current.updateLastMessage(data.content)
-          break
-        
-        case 'final':
-          storeRef.current.setStreaming(false)
-          if (data.action || data.suggestions) {
-             useUserStore.setState((state) => {
-               const newMessages = [...state.messages]
-               if (newMessages.length > 0) {
-                 const lastIdx = newMessages.length - 1
-                 newMessages[lastIdx] = {
-                   ...newMessages[lastIdx],
-                   action: data.action,
-                   suggestions: data.suggestions
-                 }
-               }
-               return { messages: newMessages }
-             })
-          }
-          break
-        
-        case 'error':
-          storeRef.current.setStreaming(false)
-          console.error('❌ [WebSocket] Error:', data.message)
-          break
+      ws.onopen = () => {
+        console.log('✅ [WebSocket] Connected')
+        reconnectAttempts = 0
+        if (isMounted.current) {
+          storeRef.current.setConnected(true)
+        }
       }
-    }
 
-    ws.onclose = () => {
-      console.log('🔌 [WebSocket] Disconnected')
-      storeRef.current.setStreaming(false)
-      storeRef.current.setConnected(false)
-      globalSocket = null
-    }
+      ws.onmessage = (event) => {
+        if (!isMounted.current) return
+        const data = JSON.parse(event.data)
+        console.log('📥 [WebSocket] Message:', data.type)
+        
+        switch (data.type) {
+          case 'start':
+            storeRef.current.setStreaming(true)
+            storeRef.current.addMessage({
+              id: Date.now().toString(),
+              role: 'assistant',
+              content: '',
+              timestamp: new Date().toISOString(),
+            })
+            break
+          
+          case 'chunk':
+            storeRef.current.updateLastMessage(data.content)
+            break
+          
+          case 'final':
+            storeRef.current.setStreaming(false)
+            if (data.action || data.suggestions) {
+               useUserStore.setState((state) => {
+                 const newMessages = [...state.messages]
+                 if (newMessages.length > 0) {
+                   const lastIdx = newMessages.length - 1
+                   newMessages[lastIdx] = {
+                     ...newMessages[lastIdx],
+                     action: data.action,
+                     suggestions: data.suggestions
+                   }
+                 }
+                 return { messages: newMessages }
+               })
+            }
+            break
+          
+          case 'error':
+            storeRef.current.setStreaming(false)
+            console.error('❌ [WebSocket] Error:', data.message)
+            break
+        }
+      }
 
-    ws.onerror = (error) => {
-      console.error('⚠️ [WebSocket] Socket Error:', error)
-      storeRef.current.setStreaming(false)
-      storeRef.current.setConnected(false)
+      ws.onclose = (event) => {
+        console.log('🔌 [WebSocket] Disconnected', event.reason)
+        if (isMounted.current) {
+          storeRef.current.setStreaming(false)
+          storeRef.current.setConnected(false)
+        }
+        globalSocket = null
+
+        // Auto-reconnect logic with exponential backoff
+        if (isMounted.current && reconnectAttempts < MAX_RECONNECT_ATTEMPTS && !event.wasClean) {
+          const timeout = Math.min(1000 * Math.pow(2, reconnectAttempts), 10000)
+          console.log(`🔄 [WebSocket] Reconnecting in ${timeout}ms...`)
+          reconnectTimeoutRef.current = window.setTimeout(() => {
+            reconnectAttempts++
+            connect()
+          }, timeout)
+        }
+      }
+
+      ws.onerror = (error) => {
+        console.error('⚠️ [WebSocket] Socket Error:', error)
+        if (isMounted.current) {
+          storeRef.current.setStreaming(false)
+          storeRef.current.setConnected(false)
+        }
+      }
+    } catch (err) {
+      console.error('🚀 [WebSocket] Connection attempt failed:', err)
     }
   }, [sessionId])
 
   useEffect(() => {
-    connect()
-    // We DON'T close the globalSocket on unmount here to avoid StrictMode issues.
-    // It will be closed if the sessionId actually changes.
+    // Small delay to let StrictMode settle or previous cleanup finish
+    const timer = window.setTimeout(() => {
+      connect()
+    }, 200)
+
+    return () => {
+      window.clearTimeout(timer)
+    }
   }, [connect])
 
   const sendMessage = (content: string) => {
+    const msg = content.trim()
+    if (!msg) return
+
     if (globalSocket?.readyState === WebSocket.OPEN) {
-      console.log('📤 [WebSocket] Sending:', content)
+      console.log('📤 [WebSocket] Sending:', msg)
       const userMessage = {
         id: Date.now().toString(),
         role: 'user',
-        content,
+        content: msg,
         timestamp: new Date().toISOString(),
       }
       storeRef.current.addMessage(userMessage as any)
       globalSocket.send(JSON.stringify({ 
         type: 'message',
-        content 
+        content: msg 
       }))
     } else {
       console.error('🚫 [WebSocket] Cannot send. State:', globalSocket?.readyState ?? 'NULL')
