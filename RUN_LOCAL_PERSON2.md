@@ -28,11 +28,11 @@ This validates Person 1 + Person 2 together on Windows.
 ```powershell
 docker pull pgvector/pgvector:pg15
 docker rm -f copilot-pgvector 2>$null
-docker run -d --name copilot-pgvector `
-  -e POSTGRES_USER=postgres `
-  -e POSTGRES_PASSWORD=postgres `
-  -e POSTGRES_DB=copilot `
-  -p 5432:5432 `
+docker run -d --name copilot-pgvector \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=copilot \
+  -p 5432:5432 \
   pgvector/pgvector:pg15
 ```
 
