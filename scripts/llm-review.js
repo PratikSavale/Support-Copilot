@@ -89,7 +89,7 @@ Respond ONLY with the JSON review object.`;
   console.log(`Diff length: ${diff.length} chars`);
 
   const model = genAI.getGenerativeModel({
-    model: "gemini-2.0-flash",
+    model: "gemini-flash-latest",
     systemInstruction,
     generationConfig: {
       responseMimeType: "application/json",
