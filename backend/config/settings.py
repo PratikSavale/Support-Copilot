@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     CHROMA_COLLECTION: str = "knowledge_chunks"
 
     # Keep as plain string to avoid pydantic-settings trying JSON decode before custom validators.
-    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:8000"
+    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:8000,http://localhost:5173"
 
     def cors_origins_list(self) -> list[str]:
         raw = (self.CORS_ORIGINS or "").strip()
