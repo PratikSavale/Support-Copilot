@@ -44,8 +44,12 @@ export const useWebSocket = (sessionId: string | null) => {
     console.log('🌐 [WebSocket] Connecting to:', `${WS_BASE_URL}/${sessionId}`)
     globalSessionId = sessionId
     
+    // Add auth token placeholder for future security implementation
+    const token = 'demo-token-placeholder'
+    const url = `${WS_BASE_URL}/${sessionId}?token=${token}`
+    
     try {
-      const ws = new WebSocket(`${WS_BASE_URL}/${sessionId}`)
+      const ws = new WebSocket(url)
       globalSocket = ws
 
       ws.onopen = () => {
