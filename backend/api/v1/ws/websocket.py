@@ -1,64 +1,44 @@
 """
 WebSocket Handler
-Provides real-time streaming for chat responses.
+Provides real-time streaming for chat responses with robust error handling and resource management.
 """
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 import json
-import asyncio
+import logging
 from datetime import datetime, timezone
+from typing import Any
 
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from pydantic import BaseModel
+
+from config.database import async_session_factory
 from services.service_factory import get_chat_service
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
-async def message_generator(session_id: str, user_message: str):
+def serialize_event(event: dict[str, Any]) -> str:
     """
-    Generator that yields chunks of the response as they are generated.
-    Enables streaming to the frontend.
+    Helper to safely serialize events containing Pydantic models, Enums, or Datetimes.
+    Ensures JSON compliance and avoids broad fallback errors.
     """
-    # Send start signal
-    yield json.dumps({
-        "type": "start",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    })
-    
+    def _convert(obj):
+        if isinstance(obj, BaseModel):
+            return obj.model_dump()
+        if hasattr(obj, "value"): # Enums
+            return obj.value
+        if isinstance(obj, (datetime, timezone)):
+            return obj.isoformat()
+        return None # Return None to let json.dumps raise TypeError if it's truly unserializable
+
     try:
-        # Process the message
-        chat_service = get_chat_service()
-        response = await chat_service.process_message(
-            db=None,  # Will be passed via WebSocket auth or db dependency
-            session_id=session_id,
-            user_message=user_message,
-        )
-        
-        # Stream the response text
-        response_text = response.response
-        chunk_size = 20  # Characters per chunk
-        
-        for i in range(0, len(response_text), chunk_size):
-            chunk = response_text[i:i + chunk_size]
-            yield json.dumps({
-                "type": "chunk",
-                "content": chunk,
-                "is_final": i + chunk_size >= len(response_text),
-            })
-            await asyncio.sleep(0.05)  # Simulate typing effect
-        
-        # Send final response metadata
-        yield json.dumps({
-            "type": "final",
-            "action": response.action,
-            "sources": response.sources,
-            "ticket": response.ticket,
-            "message_id": response.message_id,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
-        
-    except Exception as e:
-        yield json.dumps({
+        return json.dumps(event, default=_convert)
+    except (TypeError, ValueError) as e:
+        logger.error(f"Serialization error for event {event.get('type')}: {e}")
+        # Fallback to a safe error message if the specific event cannot be serialized
+        return json.dumps({
             "type": "error",
-            "message": str(e),
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "message": "Internal serialization error",
+            "timestamp": datetime.now(timezone.utc).isoformat()
         })
 
 @router.websocket("/ws/{session_id}")
@@ -70,29 +50,65 @@ async def websocket_chat(websocket: WebSocket, session_id: str):
     Server sends: JSON events (start, chunk, final, error)
     """
     await websocket.accept()
+    chat_service = get_chat_service()
     
     try:
-        # We don't generate message on connect in this design unless we want to load history.
-        # But per the plan, we just wait for user messages.
-        
         while True:
-            raw_message = await websocket.receive_text()
-            client_message = json.loads(raw_message)
+            try:
+                raw_message = await websocket.receive_text()
+                client_message = json.loads(raw_message)
+            except json.JSONDecodeError:
+                await websocket.send_text(serialize_event({
+                    "type": "error",
+                    "message": "Invalid JSON format",
+                }))
+                continue
             
             if client_message.get("type") == "message":
-                user_message = client_message.get("content", "")
+                user_message = client_message.get("content", "").strip()
                 
-                # Send response chunks
-                async for event in message_generator(session_id, user_message):
-                    await websocket.send_text(event)
+                # Validation: Ensure message is not empty
+                if not user_message:
+                    await websocket.send_text(serialize_event({
+                        "type": "error",
+                        "message": "Message content cannot be empty",
+                    }))
+                    continue
+
+                # 🔴 Resource Management: Open session only for the duration of message processing
+                # This prevents connection pool exhaustion if the socket stays idle.
+                async with async_session_factory() as db:
+                    try:
+                        async for event in chat_service.stream_message(
+                            db=db,
+                            session_id=session_id,
+                            user_message=user_message,
+                        ):
+                            # Add timestamp if missing
+                            if "timestamp" not in event:
+                                event["timestamp"] = datetime.now(timezone.utc)
+                            
+                            await websocket.send_text(serialize_event(event))
+                        
+                        await db.commit()
+                        
+                    except Exception as e:
+                        logger.error(f"Error processing message in session {session_id}: {e}", exc_info=True)
+                        await db.rollback()
+                        await websocket.send_text(serialize_event({
+                            "type": "error",
+                            "message": f"Server error: {str(e)}",
+                            "timestamp": datetime.now(timezone.utc),
+                        }))
                     
     except WebSocketDisconnect:
-        pass
+        logger.info(f"WebSocket disconnected for session {session_id}")
     except Exception as e:
+        logger.error(f"Critical WebSocket error in session {session_id}: {e}", exc_info=True)
         try:
-            await websocket.send_text(json.dumps({
+            await websocket.send_text(serialize_event({
                 "type": "error",
-                "message": str(e),
+                "message": "Internal server error occurred",
             }))
         except:
             pass

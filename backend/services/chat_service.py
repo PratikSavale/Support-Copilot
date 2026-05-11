@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, AsyncIterator
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -60,6 +60,7 @@ class ChatService:
         db: AsyncSession,
         user_id: str | None = None,
         title: str | None = None,
+        session_id: str | None = None,
     ) -> Session:
         """Create a new chat session, auto-creating the demo user if needed."""
         uid = uuid.UUID(user_id) if user_id else DEMO_USER_ID
@@ -78,6 +79,7 @@ class ChatService:
             await db.flush()
 
         session = Session(
+            id=uuid.UUID(session_id) if session_id else uuid.uuid4(),
             user_id=uid,
             title=title or "New Conversation",
             status="active",
@@ -159,21 +161,32 @@ class ChatService:
             7. LOW / MEDIUM + no good answer → escalate to Jira.
         """
 
-        # ── 1. Store user message ───────────────────────────────────────
+        # ── 1. Ensure session exists ────────────────────────────────────
+        session = await self.get_session(db, session_id)
+        if not session:
+            logger.info(f"Session {session_id} not found, creating it...")
+            session = await self.create_session(db, user_id=None, title=user_message[:80], session_id=session_id)
+            # Re-fetch or ensure session_id matches
+            session_id = str(session.id)
+
+        # ── 2. Store user message ───────────────────────────────────────
         await self._add_message(db, session_id, "user", user_message)
 
         # Auto-title the session on first user message.
-        session = await self.get_session(db, session_id)
-        if not session:
-            raise ValueError(f"Session {session_id} not found")
-
         if session.title == "New Conversation" and user_message:
             session.title = user_message[:80].strip()
 
-        recent_messages = (session.messages or [])[-10:]
+        # ── 3. Extract history safely ──────────────────────────────────
+        # For new sessions, messages will be empty. We avoid lazy-loading errors.
+        try:
+            recent_messages = session.messages[-10:] if session.messages else []
+        except Exception:
+            # Relationship not loaded, likely a new session
+            recent_messages = []
+            
         history = [m.content for m in recent_messages]
 
-        # ── 2. Initial confidence ───────────────────────────────────────
+        # ── 4. Initial confidence ───────────────────────────────────────
         initial = await self.confidence_service.calculate_initial_confidence(
             query=user_message,
             conversation_history=history,
@@ -235,11 +248,108 @@ class ChatService:
                 ticket=None,
             )
 
-        # ── 7. Still not high enough → escalate ────────────────────────
-        return await self._escalate(
-            db, session_id, user_message, history,
-            severity="high" if post["score"] < 0.25 else "medium",
+    async def stream_message(
+        self,
+        db: AsyncSession,
+        session_id: str,
+        user_message: str,
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Orchestrates the pipeline and yields chunks for streaming."""
+        
+        # 1. Ensure session exists
+        session = await self.get_session(db, session_id)
+        if not session:
+            session = await self.create_session(db, user_id=None, title=user_message[:80], session_id=session_id)
+            session_id = str(session.id)
+
+        # 2. Store user message
+        await self._add_message(db, session_id, "user", user_message)
+
+        # 3. Extract history
+        try:
+            recent_messages = session.messages[-10:] if session.messages else []
+        except Exception:
+            recent_messages = []
+        history = [m.content for m in recent_messages]
+
+        # 4. Initial confidence
+        initial = await self.confidence_service.calculate_initial_confidence(
+            query=user_message,
+            conversation_history=history,
         )
+
+        # 5. Clarification?
+        if initial["action"] == "clarification":
+            text = "I'd like to help, but I need a bit more information to give you an accurate answer."
+            msg = await self._add_message(db, session_id, "assistant", text, confidence_score=initial["score"])
+            yield {"type": "start"}
+            yield {"type": "chunk", "content": text, "is_final": True}
+            yield {
+                "type": "final",
+                "action": Action.clarification,
+                "suggestions": initial.get("follow_up_questions", []),
+                "message_id": str(msg.id)
+            }
+            return
+
+        # 6. RAG Search
+        search_results = await self.rag_engine.search(user_message)
+        if not search_results:
+            resp = await self._escalate(db, session_id, user_message, history, "medium")
+            yield {"type": "start"}
+            yield {"type": "chunk", "content": resp.response, "is_final": True}
+            yield {
+                "type": "final",
+                "action": Action.escalated,
+                "ticket": resp.ticket,
+                "message_id": resp.message_id
+            }
+            return
+
+        # 7. Post-retrieval confidence
+        post = await self.confidence_service.calculate_post_retrieval_confidence(
+            query=user_message,
+            retrieved_docs=search_results,
+        )
+
+        # 8. Resolve or Escalate?
+        if post["action"] == "resolve":
+            yield {"type": "start"}
+            full_response = ""
+            async for chunk in self.rag_engine.generate_response_stream(user_message, search_results):
+                full_response += chunk
+                yield {"type": "chunk", "content": chunk}
+            
+            # Save to DB after streaming finishes
+            sources = [
+                {
+                    "source_id": str(doc.get("metadata", {}).get("source_id", "")),
+                    "title": str(doc.get("metadata", {}).get("source_title", "")),
+                    "chunk_excerpt": doc.get("content", "")[:200],
+                }
+                for doc in search_results
+            ]
+            msg = await self._add_message(
+                db, session_id, "assistant", full_response,
+                confidence_score=post["score"],
+                sources=sources
+            )
+            yield {
+                "type": "final",
+                "action": Action.resolve,
+                "sources": [SourceInfo(**s) for s in sources],
+                "message_id": str(msg.id)
+            }
+        else:
+            resp = await self._escalate(db, session_id, user_message, history, "high")
+            yield {"type": "start"}
+            yield {"type": "chunk", "content": resp.response, "is_final": True}
+            yield {
+                "type": "final",
+                "action": Action.escalated,
+                "ticket": resp.ticket,
+                "message_id": resp.message_id
+            }
 
     # ------------------------------------------------------------------
     # Escalation helper

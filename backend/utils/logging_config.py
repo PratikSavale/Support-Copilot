@@ -6,7 +6,7 @@ import logging
 import sys
 from pythonjsonlogger import jsonlogger
 
-def setup_logging(level: str = "INFO"):
+def setup_logging(level: str = "WARNING"):
     """Configure application logging."""
     logger = logging.getLogger()
     logger.setLevel(getattr(logging, level.upper()))

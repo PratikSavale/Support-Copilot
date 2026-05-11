@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any
+import asyncio
+from typing import Any, AsyncIterator
 
 from ai.chroma_utils import get_chroma_client, get_collection
 from ai.embedding_engine import get_embedding_engine
@@ -63,7 +64,7 @@ class RAGEngine:
         }
         if filters:
             query_kwargs["where"] = filters
-        result = self.collection.query(**query_kwargs)
+        result = await asyncio.to_thread(self.collection.query, **query_kwargs)
 
         ids = result.get("ids", [[]])[0]
         docs = result.get("documents", [[]])[0]
@@ -83,6 +84,26 @@ class RAGEngine:
                 }
             )
         return rows
+
+    async def generate_response_stream(
+        self, query: str, context_docs: list[dict[str, Any]]
+    ) -> AsyncIterator[str]:
+        context = "\n\n".join(doc.get("content", "") for doc in context_docs)
+        messages = [
+            {
+                "role": "user",
+                "content": (
+                    "Based on the documentation below, answer the user question.\n\n"
+                    f"Documentation:\n{context}\n\n"
+                    f"User Question: {query}\n\n"
+                    "If documentation is insufficient, explicitly say so."
+                ),
+            }
+        ]
+        async for chunk in self.llm_engine.generate_response_stream(
+            messages, system_prompt=CHAT_SYSTEM_PROMPT
+        ):
+            yield chunk
 
     async def generate_response(
         self, query: str, context_docs: list[dict[str, Any]]
