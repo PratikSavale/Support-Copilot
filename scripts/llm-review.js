@@ -89,7 +89,7 @@ Respond ONLY with the JSON review object.`;
   console.log(`Diff length: ${diff.length} chars`);
 
   const model = genAI.getGenerativeModel({
-    model: "gemini-1.5-flash",
+    model: "gemini-flash-latest",
     systemInstruction,
     generationConfig: {
       responseMimeType: "application/json",
@@ -108,17 +108,17 @@ Respond ONLY with the JSON review object.`;
     // Robust cleaning: Find the first '{' and last '}' to extract JSON
     const firstBrace = responseText.indexOf("{");
     const lastBrace = responseText.lastIndexOf("}");
-    
+
     if (firstBrace === -1 || lastBrace === -1) {
       throw new Error("No JSON object found in response");
     }
-    
+
     let clean = responseText.substring(firstBrace, lastBrace + 1);
-    
+
     // Remove potential trailing commas before closing braces/brackets
     // This handles cases like: { "a": 1, } or [ 1, 2, ]
     clean = clean.replace(/,\s*([}\]])/g, '$1');
-    
+
     review = JSON.parse(clean);
   } catch (err) {
     console.error("Failed to parse JSON response:", err.message);
