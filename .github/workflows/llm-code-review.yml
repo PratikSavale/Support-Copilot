@@ -48,9 +48,14 @@ jobs:
 
           echo "$CHANGED_FILES" > ${{ runner.temp }}/changed_files.txt
 
-          # Get the diff safely using pathspec-from-file
-          git diff origin/${{ github.base_ref }}...HEAD --pathspec-from-file=${{ runner.temp }}/changed_files.txt \
-            | head -c 30000 > ${{ runner.temp }}/pr_diff.txt
+          # Get the diff safely — use pathspec-from-file only if there are files to review
+          if [ -s ${{ runner.temp }}/changed_files.txt ]; then
+            git diff origin/${{ github.base_ref }}...HEAD -- \
+              $(cat ${{ runner.temp }}/changed_files.txt | while IFS= read -r f; do printf '%q ' "$f"; done) \
+              | head -c 30000 > ${{ runner.temp }}/pr_diff.txt
+          else
+            touch ${{ runner.temp }}/pr_diff.txt
+          fi
 
           echo "Diff size: $(wc -c < ${{ runner.temp }}/pr_diff.txt) bytes"
 
@@ -71,8 +76,9 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
-            const review = fs.readFileSync('${{ runner.temp }}/review_output.json', 'utf8');
-            const { summary, comments, overallScore, recommendation } = JSON.parse(review);
+            const reviewRaw = fs.readFileSync('${{ runner.temp }}/review_output.json', 'utf8');
+            const review = JSON.parse(reviewRaw);
+            const { summary, comments, overallScore, recommendation, isTruncated } = review;
 
             // Post a summary comment on the PR
             const scoreEmoji = overallScore >= 8 ? '✅' : overallScore >= 5 ? '⚠️' : '❌';
@@ -90,7 +96,7 @@ jobs:
               `### Summary`,
               summary,
               ``,
-              review.isTruncated ? `> [!WARNING]\n> **Partial Review**: The PR diff or file list was truncated due to size limits. Some changes may not have been reviewed.` : '',
+              isTruncated ? `> [!WARNING]\n> **Partial Review**: The PR diff or file list was truncated due to size limits. Some changes may not have been reviewed.` : '',
               ``,
               comments.length > 0 ? `### Findings (${comments.length})` : '',
               comments.map(c => [
