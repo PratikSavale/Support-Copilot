@@ -7,11 +7,18 @@
 
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const fs = require("fs");
+const path = require("path");
+const os = require("os");
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
+// Use a secure temp directory
+const TEMP_DIR = process.env.RUNNER_TEMP || os.tmpdir();
+const DIFF_PATH = process.env.DIFF_PATH || path.join(TEMP_DIR, "pr_diff.txt");
+const OUTPUT_PATH = process.env.OUTPUT_PATH || path.join(TEMP_DIR, "review_output.json");
+
 async function runCodeReview() {
-  const diff = fs.readFileSync("/tmp/pr_diff.txt", "utf8");
+  const diff = fs.readFileSync(DIFF_PATH, "utf8");
   const prTitle = process.env.PR_TITLE || "Untitled PR";
   const prDescription = process.env.PR_DESCRIPTION || "No description provided";
   const prAuthor = process.env.PR_AUTHOR || "Unknown";
@@ -29,7 +36,7 @@ async function runCodeReview() {
       overallScore: 10,
       recommendation: "APPROVE",
     };
-    fs.writeFileSync("/tmp/review_output.json", JSON.stringify(emptyReview));
+    fs.writeFileSync(OUTPUT_PATH, JSON.stringify(emptyReview));
     return;
   }
 
@@ -111,7 +118,22 @@ Respond ONLY with the JSON review object.`;
     },
   });
 
-  const result = await model.generateContent(userPrompt);
+  // Retry logic with exponential backoff
+  let result;
+  let retries = 3;
+  for (let i = 0; i < retries; i++) {
+    try {
+      result = await model.generateContent(userPrompt);
+      break;
+    } catch (err) {
+      if (i === retries - 1) throw err;
+      const delay = Math.pow(2, i) * 2000;
+      console.warn(`Gemini API call failed (attempt ${i + 1}/${retries}). Retrying in ${delay}ms...`);
+      console.warn(`Error: ${err.message}`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+
   const responseText = result.response.text();
 
   console.log("Raw response (first 200 chars):", responseText.slice(0, 200) + "...");
@@ -152,7 +174,7 @@ Respond ONLY with the JSON review object.`;
 
   review.isTruncated = isDiffTruncated || isFilesTruncated;
 
-  fs.writeFileSync("/tmp/review_output.json", JSON.stringify(review, null, 2));
+  fs.writeFileSync(OUTPUT_PATH, JSON.stringify(review, null, 2));
   console.log(`Review complete. Score: ${review.overallScore}/10, Recommendation: ${review.recommendation}`);
   console.log(`Found ${review.comments.length} comment(s).`);
 }
@@ -165,6 +187,6 @@ runCodeReview().catch((err) => {
     overallScore: 5,
     recommendation: "COMMENT",
   };
-  fs.writeFileSync("/tmp/review_output.json", JSON.stringify(fallback));
+  fs.writeFileSync(OUTPUT_PATH, JSON.stringify(fallback));
   process.exit(1);
 });

@@ -46,12 +46,13 @@ jobs:
           echo "$CHANGED_FILES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-          # Get the diff (limit size to avoid token limits)
-          git diff origin/${{ github.base_ref }}...HEAD -- \
-            $(echo "$CHANGED_FILES" | tr '\n' ' ') \
-            | head -c 30000 > /tmp/pr_diff.txt
+          echo "$CHANGED_FILES" > ${{ runner.temp }}/changed_files.txt
 
-          echo "Diff size: $(wc -c < /tmp/pr_diff.txt) bytes"
+          # Get the diff safely using pathspec-from-file
+          git diff origin/${{ github.base_ref }}...HEAD --pathspec-from-file=${{ runner.temp }}/changed_files.txt \
+            | head -c 30000 > ${{ runner.temp }}/pr_diff.txt
+
+          echo "Diff size: $(wc -c < ${{ runner.temp }}/pr_diff.txt) bytes"
 
       - name: Run LLM Code Review
         env:
@@ -70,7 +71,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
-            const review = fs.readFileSync('/tmp/review_output.json', 'utf8');
+            const review = fs.readFileSync('${{ runner.temp }}/review_output.json', 'utf8');
             const { summary, comments, overallScore, recommendation } = JSON.parse(review);
 
             // Post a summary comment on the PR
