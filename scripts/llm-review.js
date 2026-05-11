@@ -89,29 +89,40 @@ Respond ONLY with the JSON review object.`;
   console.log(`Diff length: ${diff.length} chars`);
 
   const model = genAI.getGenerativeModel({
-    model: "gemini-flash-latest",
+    model: "gemini-1.5-flash",
     systemInstruction,
     generationConfig: {
       responseMimeType: "application/json",
       maxOutputTokens: 2048,
-      temperature: 0.2,
+      temperature: 0.1,
     },
   });
 
   const result = await model.generateContent(userPrompt);
   const responseText = result.response.text();
 
-  console.log("Raw response:", responseText.slice(0, 200) + "...");
+  console.log("Raw response (first 200 chars):", responseText.slice(0, 200) + "...");
 
   let review;
   try {
-    const clean = responseText
-      .replace(/^```json\s*/i, "")
-      .replace(/```\s*$/, "")
-      .trim();
+    // Robust cleaning: Find the first '{' and last '}' to extract JSON
+    const firstBrace = responseText.indexOf("{");
+    const lastBrace = responseText.lastIndexOf("}");
+    
+    if (firstBrace === -1 || lastBrace === -1) {
+      throw new Error("No JSON object found in response");
+    }
+    
+    let clean = responseText.substring(firstBrace, lastBrace + 1);
+    
+    // Remove potential trailing commas before closing braces/brackets
+    // This handles cases like: { "a": 1, } or [ 1, 2, ]
+    clean = clean.replace(/,\s*([}\]])/g, '$1');
+    
     review = JSON.parse(clean);
   } catch (err) {
     console.error("Failed to parse JSON response:", err.message);
+    console.error("Full response for debugging:", responseText);
     review = {
       summary: "The AI reviewer encountered an issue processing the diff. Please review manually.",
       comments: [],

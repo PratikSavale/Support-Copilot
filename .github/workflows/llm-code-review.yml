@@ -98,7 +98,7 @@ jobs:
               ].filter(Boolean).join('\n')).join('\n\n'),
               ``,
               `---`,
-              `*Powered by Claude AI · [skip-review] in PR title to disable*`,
+              `*Powered by Google Gemini · [skip-review] in PR title to disable*`,
             ].filter(s => s !== undefined).join('\n');
 
             await github.rest.issues.createComment({
