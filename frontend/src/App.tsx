@@ -3,34 +3,48 @@ import { UserLayout } from './layouts/UserLayout'
 import { AdminLayout } from './layouts/AdminLayout'
 import { ChatPage } from './pages/ChatPage'
 import { TicketsLandingPage } from './pages/TicketsLandingPage'
+import { LoginPage } from './pages/LoginPage'
 import { AdminDashboard, KnowledgePage, TicketsPage } from './pages/AdminPages'
+import { useAuthStore } from './store/authStore'
+
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
+  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />
+}
 
 function App() {
   return (
     <Router>
       <Routes>
+        <Route path="/login" element={<LoginPage />} />
         <Route 
           path="/" 
           element={
-            <UserLayout>
-              <TicketsLandingPage />
-            </UserLayout>
+            <ProtectedRoute>
+              <UserLayout>
+                <TicketsLandingPage />
+              </UserLayout>
+            </ProtectedRoute>
           } 
         />
         <Route 
           path="/tickets" 
           element={
-            <UserLayout>
-              <TicketsLandingPage />
-            </UserLayout>
+            <ProtectedRoute>
+              <UserLayout>
+                <TicketsLandingPage />
+              </UserLayout>
+            </ProtectedRoute>
           } 
         />
         <Route 
           path="/chat/:sessionId" 
           element={
-            <UserLayout>
-              <ChatPage />
-            </UserLayout>
+            <ProtectedRoute>
+              <UserLayout>
+                <ChatPage />
+              </UserLayout>
+            </ProtectedRoute>
           } 
         />
         
@@ -38,25 +52,31 @@ function App() {
         <Route 
           path="/admin" 
           element={
-            <AdminLayout>
-              <AdminDashboard />
-            </AdminLayout>
+            <ProtectedRoute>
+              <AdminLayout>
+                <AdminDashboard />
+              </AdminLayout>
+            </ProtectedRoute>
           } 
         />
         <Route 
           path="/admin/knowledge" 
           element={
-            <AdminLayout>
-              <KnowledgePage />
-            </AdminLayout>
+            <ProtectedRoute>
+              <AdminLayout>
+                <KnowledgePage />
+              </AdminLayout>
+            </ProtectedRoute>
           } 
         />
         <Route 
           path="/admin/tickets" 
           element={
-            <AdminLayout>
-              <TicketsPage />
-            </AdminLayout>
+            <ProtectedRoute>
+              <AdminLayout>
+                <TicketsPage />
+              </AdminLayout>
+            </ProtectedRoute>
           } 
         />
       </Routes>
