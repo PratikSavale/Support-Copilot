@@ -29,7 +29,7 @@ export const KnowledgeSourceSelector = () => {
   if (readySources.length === 0) return null
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative w-fit mx-auto" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
@@ -51,11 +51,11 @@ export const KnowledgeSourceSelector = () => {
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: 8, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.95 }}
+            initial={{ opacity: 0, y: 8, scale: 0.95, x: "-50%" }}
+            animate={{ opacity: 1, y: 0, scale: 1, x: "-50%" }}
+            exit={{ opacity: 0, y: 8, scale: 0.95, x: "-50%" }}
             transition={{ duration: 0.15 }}
-            className="absolute top-full mt-2 left-1/2 -translate-x-1/2 w-64 bg-[#0B0F19] border border-white/10 rounded-2xl shadow-xl shadow-black/50 z-50 overflow-hidden flex flex-col"
+            className="absolute top-full mt-3 left-1/2 w-72 bg-[#0B0F19]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl shadow-black/80 z-[100] overflow-hidden flex flex-col"
           >
             <div className="px-4 py-3 border-b border-white/5 bg-white/5">
               <h4 className="text-[10px] text-white/40 font-bold uppercase tracking-widest">Select Context</h4>

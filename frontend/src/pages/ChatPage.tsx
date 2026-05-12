@@ -7,7 +7,6 @@ import { useWebSocket } from '../hooks/useWebSocket'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Sparkles, MessageSquare, AlertTriangle, RefreshCcw } from 'lucide-react'
 import { TicketNotification } from '../components/TicketNotification'
-import { KnowledgeSourceSelector } from '../components/KnowledgeSourceSelector'
 
 export const ChatPage = () => {
   const { sessionId } = useParams<{ sessionId: string }>()
@@ -41,10 +40,6 @@ export const ChatPage = () => {
 
   return (
     <div className="flex flex-col h-full gap-6">
-      <div className="flex items-center justify-center shrink-0 h-10">
-        <KnowledgeSourceSelector />
-      </div>
-
       {!isConnected && (
         <motion.div 
           initial={{ opacity: 0, y: -20 }}

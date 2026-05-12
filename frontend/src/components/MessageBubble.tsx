@@ -6,6 +6,9 @@ import { ClarificationChips } from './ClarificationChips'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { useParams } from 'react-router-dom'
 
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+
 interface MessageBubbleProps {
   message: Message
 }
@@ -39,8 +42,17 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
               : "bg-gradient-to-br from-nebula-blue to-nebula-purple text-white shadow-lg shadow-nebula-blue/10"
           )}
         >
-          <div className="text-sm leading-relaxed whitespace-pre-wrap">
-            {message.content}
+          <div className={cn(
+            "text-sm leading-relaxed prose prose-invert prose-sm max-w-none",
+            "prose-p:leading-relaxed prose-pre:bg-white/5 prose-pre:border prose-pre:border-white/10",
+            "prose-headings:text-white prose-headings:font-semibold prose-headings:mt-4 prose-headings:mb-2",
+            "prose-a:text-nebula-blue hover:prose-a:text-nebula-blue/80",
+            "prose-code:text-nebula-blue prose-code:bg-white/5 prose-code:px-1 prose-code:rounded prose-code:before:content-none prose-code:after:content-none",
+            !isAI && "prose-headings:text-white prose-p:text-white prose-strong:text-white prose-code:text-white prose-code:bg-black/20"
+          )}>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {message.content}
+            </ReactMarkdown>
             {!message.content && isAI && (
               <div className="flex gap-1 items-center py-2">
                 <span className="w-1.5 h-1.5 bg-white/40 rounded-full animate-bounce [animation-delay:-0.3s]" />
