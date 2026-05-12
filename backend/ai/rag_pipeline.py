@@ -25,6 +25,7 @@ class RAGEngine:
         self.llm_engine = get_llm_engine()
         client = get_chroma_client()
         self.collection = get_collection(client, settings.CHROMA_COLLECTION)
+        self.batch_size = settings.CHROMA_BATCH_SIZE
 
     async def add_documents(
         self, source_id: str, source_title: str, chunks: list[str]
@@ -46,12 +47,11 @@ class RAGEngine:
 
         # ChromaDB has a maximum batch size (often 5461). 
         # We split the upload into smaller batches to avoid ValueError.
-        MAX_BATCH_SIZE = 5000
-        for i in range(0, len(chunks), MAX_BATCH_SIZE):
-            batch_chunks = chunks[i : i + MAX_BATCH_SIZE]
-            batch_embeddings = embeddings[i : i + MAX_BATCH_SIZE]
-            batch_metadatas = metadatas[i : i + MAX_BATCH_SIZE]
-            batch_ids = ids[i : i + MAX_BATCH_SIZE]
+        for i in range(0, len(chunks), self.batch_size):
+            batch_chunks = chunks[i : i + self.batch_size]
+            batch_embeddings = embeddings[i : i + self.batch_size]
+            batch_metadatas = metadatas[i : i + self.batch_size]
+            batch_ids = ids[i : i + self.batch_size]
 
             self.collection.upsert(
                 documents=batch_chunks,
