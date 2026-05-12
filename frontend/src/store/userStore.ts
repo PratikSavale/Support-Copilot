@@ -11,14 +11,22 @@ export interface Message {
   suggestions?: string[]
 }
 
+export interface Session {
+  id: string
+  title: string
+  status: string
+  created_at: string
+}
+
 interface UserState {
   sessionId: string | null
+  sessions: Session[]
   messages: Message[]
   isStreaming: boolean
   isHistoryLoading: boolean
   isConnected: boolean
   availableSources: { id: string; title?: string; url: string; status: string }[]
-  selectedSources: string[] // Array of selected source IDs
+  selectedSources: string[]
   
   // Actions
   setSessionId: (id: string) => void
@@ -29,6 +37,8 @@ interface UserState {
   setConnected: (isConnected: boolean) => void
   clearMessages: () => void
   setMessages: (messages: Message[]) => void
+  fetchSessions: () => Promise<void>
+  fetchSessionHistory: (id: string) => Promise<void>
   fetchAvailableSources: () => Promise<void>
   toggleSourceSelection: (sourceId: string) => void
 }
@@ -39,10 +49,11 @@ const api = axios.create({
 
 export const useUserStore = create<UserState>((set) => ({
   sessionId: null,
+  sessions: [],
   messages: [],
   isStreaming: false,
   isHistoryLoading: false,
-  isConnected: true, // Default to true, update on error
+  isConnected: true,
   availableSources: [],
   selectedSources: [],
 
@@ -76,11 +87,32 @@ export const useUserStore = create<UserState>((set) => ({
 
   setMessages: (messages) => set({ messages }),
 
+  fetchSessions: async () => {
+    try {
+      const response = await api.get('/chat/sessions')
+      const sessions = response.data.sessions || response.data
+      set({ sessions })
+    } catch (err) {
+      console.error('Failed to load sessions', err)
+    }
+  },
+
+  fetchSessionHistory: async (id) => {
+    set({ isHistoryLoading: true })
+    try {
+      const response = await api.get(`/chat/sessions/${id}`)
+      const messages = response.data.messages || []
+      set({ messages, isHistoryLoading: false })
+    } catch (err) {
+      console.error('Failed to load session history', err)
+      set({ isHistoryLoading: false })
+    }
+  },
+
   fetchAvailableSources: async () => {
     try {
       const response = await api.get('/knowledge/sources')
       const sources = response.data.sources || response.data
-      // Filter out only indexed/ready sources if needed, or show all
       set({ availableSources: sources })
     } catch (err) {
       console.error('Failed to load knowledge sources', err)

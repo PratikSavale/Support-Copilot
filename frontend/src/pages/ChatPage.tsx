@@ -11,7 +11,7 @@ import { TicketNotification } from '../components/TicketNotification'
 export const ChatPage = () => {
   const { sessionId } = useParams<{ sessionId: string }>()
   const navigate = useNavigate()
-  const { messages, setSessionId, isStreaming, clearMessages, isConnected } = useUserStore()
+  const { messages, setSessionId, isStreaming, clearMessages, isConnected, fetchSessionHistory } = useUserStore()
   const { sendMessage } = useWebSocket(sessionId || null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -29,7 +29,8 @@ export const ChatPage = () => {
       return
     }
     setSessionId(sessionId)
-  }, [sessionId, setSessionId, navigate])
+    fetchSessionHistory(sessionId)
+  }, [sessionId, setSessionId, navigate, fetchSessionHistory])
 
   // Auto-scroll
   useEffect(() => {
@@ -130,7 +131,7 @@ export const ChatPage = () => {
              }}
              className="text-[10px] text-nebula-blue/40 hover:text-nebula-blue/80 uppercase tracking-widest font-bold transition-colors"
            >
-             New Session
+             New Ticket
            </button>
         </div>
       </div>
