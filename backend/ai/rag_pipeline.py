@@ -44,13 +44,22 @@ class RAGEngine:
             for i in range(len(chunks))
         ]
 
-        # Use upsert so re-indexing same source does not fail on duplicate IDs.
-        self.collection.upsert(
-            documents=chunks,
-            embeddings=embeddings,
-            metadatas=metadatas,
-            ids=ids,
-        )
+        # ChromaDB has a maximum batch size (often 5461). 
+        # We split the upload into smaller batches to avoid ValueError.
+        MAX_BATCH_SIZE = 5000
+        for i in range(0, len(chunks), MAX_BATCH_SIZE):
+            batch_chunks = chunks[i : i + MAX_BATCH_SIZE]
+            batch_embeddings = embeddings[i : i + MAX_BATCH_SIZE]
+            batch_metadatas = metadatas[i : i + MAX_BATCH_SIZE]
+            batch_ids = ids[i : i + MAX_BATCH_SIZE]
+
+            self.collection.upsert(
+                documents=batch_chunks,
+                embeddings=batch_embeddings,
+                metadatas=batch_metadatas,
+                ids=batch_ids,
+            )
+        
         return len(chunks)
 
     async def search(
