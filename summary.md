@@ -16,6 +16,7 @@
 - **AI/ML**: Google Gemini API (`gemini-2.0-flash`), LangChain, FastEmbed (local `BAAI/bge-small-en-v1.5`)
 - **Databases**: PostgreSQL 15 (relational + pgvector), ChromaDB (vector search), Redis (caching)
 - **Real-time**: WebSocket streaming for live AI responses
+- **Authentication**: JWT-based secure authentication with registration and protected routes
 - **External Integrations**: Jira Cloud API (with automatic mock fallback for demo reliability)
 
 ---
@@ -66,6 +67,7 @@ Support-Copilot/
 │   │       ├── tickets.py       # Ticket endpoints: GET /, GET /{id}, POST /escalate, PUT /{id}
 │   │       ├── knowledge.py     # Knowledge endpoints: POST /sources, GET /sources, DELETE /sources/{id}, POST /sources/{id}/reindex
 │   │       ├── analytics.py     # Analytics endpoints: GET /overview, GET /trends, GET /issues
+│   │       ├── auth.py          # Auth endpoints: POST /register, POST /login
 │   │       └── ws/
 │   │           └── websocket.py # WebSocket endpoint: /ws/{session_id} — handles real-time streaming events (start, chunk, final, error)
 │   │
@@ -76,7 +78,7 @@ Support-Copilot/
 │   │   ├── ticket_service.py    # Ticket creation from chat (LLM-extracted fields) + Jira sync + CRUD
 │   │   ├── knowledge_service.py # Knowledge ingestion: add source → crawl → chunk → embed → ChromaDB store
 │   │   ├── analytics_service.py # Metrics aggregation and trend analysis
-│   │   ├── confidence_service.py # Confidence scoring with thresholds (LOW=0.20, HIGH=0.60) and weights (retrieval=0.40, relevance=0.35, completeness=0.25)
+│   │   ├── auth_service.py      # Auth logic: registration, password hashing (bcrypt), JWT generation
 │   │   ├── jira_client.py       # Jira REST API wrapper with automatic mock fallback when credentials missing
 │   │   └── service_factory.py   # @lru_cache factory: get_chat_service(), get_ticket_service(), get_knowledge_service(), etc.
 │   │
@@ -118,6 +120,8 @@ Support-Copilot/
 │   │   ├── config/api.ts        # API base URLs: VITE_API_BASE_URL, VITE_WS_URL
 │   │   │
 │   │   ├── pages/
+│   │   │   ├── LoginPage.tsx    # Secure login/registration page with success/error handling
+│   │   │   ├── TicketsLandingPage.tsx # Root landing page showing ticket history and "New Ticket" entry
 │   │   │   ├── ChatPage.tsx     # Main chat page: message display, streaming, knowledge source selector, ticket notification, connection status indicator
 │   │   │   └── AdminPages.tsx   # Admin pages: AdminDashboard (metrics), KnowledgePage (source management), TicketsPage (ticket list with filters)
 │   │   │
@@ -135,7 +139,8 @@ Support-Copilot/
 │   │   │   └── Header.tsx           # App header component
 │   │   │
 │   │   ├── store/
-│   │   │   ├── userStore.ts     # Zustand store: sessionId, messages[], isStreaming, isConnected, availableSources, selectedSources — actions: addMessage, updateLastMessage, setStreaming, fetchAvailableSources, toggleSourceSelection
+│   │   │   ├── userStore.ts     # Zustand store: sessionId, messages[], isStreaming, isConnected, availableSources
+│   │   │   ├── authStore.ts     # Auth store: user info, token, isAuthenticated, login/logout/register actions
 │   │   │   └── adminStore.ts    # Admin Zustand store: metrics, knowledgeSources[], tickets[] — actions: loadMetrics, loadKnowledgeSources, loadTickets
 │   │   │
 │   │   ├── hooks/
@@ -186,6 +191,13 @@ Support-Copilot/
 | POST | `/sessions/{id}/messages` | `{ "message": str, "follow_up_responses": str[]? }` | `ChatResponse` | Send message, get AI response with action |
 | GET | `/sessions` | — | `{ sessions: SessionResponse[] }` | List all sessions |
 | GET | `/sessions/{id}` | — | `{ id, title, status, messages: MessageResponse[] }` | Get session with full message history |
+
+### Auth API (`/api/v1/auth`)
+
+| Method | Endpoint | Request Body | Response | Description |
+|--------|----------|-------------|----------|-------------|
+| POST | `/register` | `{ username, email, password }` | `UserResponse` | Create new user account |
+| POST | `/login` | `{ email, password }` | `{ access_token, token_type }` | Authenticate and get JWT token |
 
 **ChatResponse fields**: `session_id`, `message_id`, `response`, `sources: SourceInfo[]`, `action` (resolve/clarification/escalated/searching), `follow_up_questions`, `ticket: TicketInfo?`
 
@@ -346,12 +358,12 @@ Runs as FastAPI BackgroundTask (separate DB session):
 ### Routing
 
 ```
-/          → redirect to /chat
-/chat      → UserView (ChatPage)
-/chat/:sessionId → UserView (ChatPage with existing session)
-/admin     → AdminView (AdminDashboard)
-/admin/knowledge → AdminView (KnowledgePage)
-/admin/tickets   → AdminView (TicketsPage)
+/          → UserView (TicketsLandingPage) - Protected
+/login     → LoginPage
+/chat/:sessionId → UserView (ChatPage with session history) - Protected
+/admin     → AdminView (AdminDashboard) - Protected
+/admin/knowledge → AdminView (KnowledgePage) - Protected
+/admin/tickets   → AdminView (TicketsPage) - Protected
 ```
 
 ---
@@ -390,7 +402,8 @@ Frontend env vars (in `frontend/.env`):
 - **WebSocket Resource Management**: DB session opened only for duration of message processing, then closed
 - **ChromaDB Upsert**: Uses upsert (not insert) for re-indexing — handles duplicate IDs gracefully
 - **Retry Logic**: LLM calls wrapped with tenacity retry (3 attempts, exponential backoff 2-10s)
-- **Demo User**: Hardcoded demo user (`00000000-0000-0000-0000-000000000001`) — no auth layer yet
+- **Secure Auth**: Full JWT implementation with `bcrypt` for password hashing
+- **Protected Routes**: Frontend navigation guarded by `ProtectedRoute` HOC
 - **Path Alias**: Frontend uses `@/` alias pointing to `src/` (configured in `vite.config.ts`)
 
 ---
@@ -399,10 +412,10 @@ Frontend env vars (in `frontend/.env`):
 
 This is a hackathon-project in active development. The core pipeline (chat → confidence → RAG → response/escalation) is implemented. Key areas under development:
 - WebSocket streaming for real-time responses
+- Full JWT Authentication and User Registration system
+- Tickets Landing Page and Session History management
 - Knowledge ingestion background pipeline
 - Admin dashboard with metrics and ticket management
-- Confidence scoring refinement
-- Frontend polish and error handling
 
 ---
 
