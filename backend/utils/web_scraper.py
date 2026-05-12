@@ -4,12 +4,15 @@ Web scraper utility for knowledge ingestion.
 Fetches web pages and extracts clean text using httpx + BeautifulSoup.
 """
 
-from __future__ import annotations
-
+import asyncio
+import logging
 import re
+from urllib.parse import urldefrag, urljoin, urlparse
 
 import httpx
 from bs4 import BeautifulSoup
+
+logger = logging.getLogger(__name__)
 
 
 class WebScraper:
@@ -31,10 +34,12 @@ class WebScraper:
             httpx.HTTPStatusError: On non-2xx responses.
         """
         headers = {
-            "User-Agent": "Mozilla/5.0 (compatible; CopilotBot/1.0)",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
         }
         async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
             response = await client.get(url, headers=headers)
+            if response.status_code != 200:
+                logger.warning("Fetch failed for %s: Status %s", url, response.status_code)
             response.raise_for_status()
             return self._parse_html(response.text)
 
@@ -57,16 +62,25 @@ class WebScraper:
         Returns:
             List of cleaned text content strings, one per page.
         """
-        import asyncio
-        import logging
-        from urllib.parse import urljoin, urldefrag
-
-        logger = logging.getLogger(__name__)
+        # Prepare scope: we want to stay on the same domain and under the same path prefix.
+        # We strip query and fragment from start_url to determine the allowed path.
+        parsed_start = urlparse(start_url)
+        path = parsed_start.path
+        if not path.endswith("/"):
+            # If it's a file (has an extension), take the parent directory.
+            if "." in path.split("/")[-1]:
+                path = "/".join(path.split("/")[:-1]) + "/"
+            else:
+                path += "/"
+        
+        scope_prefix = f"{parsed_start.scheme}://{parsed_start.netloc}{path}"
 
         visited: set[str] = {start_url}
         queue: list[str] = [start_url]
         results: list[str] = []
-        headers = {"User-Agent": "Mozilla/5.0 (compatible; CopilotBot/1.0)"}
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        }
         semaphore = asyncio.Semaphore(max_concurrent)
 
         async def fetch_one(client: httpx.AsyncClient, url: str) -> tuple[str, list[str]]:
@@ -74,7 +88,15 @@ class WebScraper:
             async with semaphore:
                 try:
                     response = await client.get(url, headers=headers)
-                    response.raise_for_status()
+                    if response.status_code != 200:
+                        logger.warning("HTTP %s for %s", response.status_code, url)
+                        return "", []
+                    
+                    content_type = response.headers.get("Content-Type", "").lower()
+                    if "text/html" not in content_type:
+                        logger.debug("Skipping non-HTML content type %s for %s", content_type, url)
+                        return "", []
+
                 except httpx.HTTPStatusError as exc:
                     logger.warning("HTTP %s for %s", exc.response.status_code, url)
                     return "", []
@@ -83,16 +105,24 @@ class WebScraper:
                     return "", []
 
                 html = response.text
+                if not html or len(html.strip()) < 100:
+                    logger.debug("Page %s returned very short HTML (%d chars)", url, len(html) if html else 0)
+                
                 soup = BeautifulSoup(html, "html.parser")
 
                 # --- extract links ---
                 new_urls: list[str] = []
                 for tag in soup.find_all(["a", "frame", "iframe"]):
                     href = tag.get("href") or tag.get("src")
-                    if href:
+                    if isinstance(href, str):
                         abs_url = urljoin(url, href)
                         abs_url, _ = urldefrag(abs_url)
-                        if abs_url.startswith(start_url):
+                        
+                        # Check if abs_url starts with our scope prefix (ignoring query/params)
+                        parsed_abs = urlparse(abs_url)
+                        abs_path_only = f"{parsed_abs.scheme}://{parsed_abs.netloc}{parsed_abs.path}"
+                        
+                        if abs_path_only.startswith(scope_prefix):
                             new_urls.append(abs_url)
 
                 # --- extract text ---
@@ -108,7 +138,7 @@ class WebScraper:
 
                 return text, new_urls
 
-        logger.info("Starting crawl of %s (max_pages=%d)", start_url, max_pages)
+        logger.info("Starting crawl of %s (scope_prefix=%s, max_pages=%d)", start_url, scope_prefix, max_pages)
 
         async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
             while queue and len(results) < max_pages:
