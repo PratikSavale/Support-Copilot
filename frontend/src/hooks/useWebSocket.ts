@@ -160,9 +160,13 @@ export const useWebSocket = (sessionId: string | null) => {
         timestamp: new Date().toISOString(),
       }
       storeRef.current.addMessage(userMessage as any)
+      
+      const { selectedSources } = useUserStore.getState()
+      
       globalSocket.send(JSON.stringify({ 
         type: 'message',
-        content: msg 
+        content: msg,
+        knowledge_sources: selectedSources.length > 0 ? selectedSources : undefined
       }))
     } else {
       console.error('🚫 [WebSocket] Cannot send. State:', globalSocket?.readyState ?? 'NULL')

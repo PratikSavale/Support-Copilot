@@ -148,6 +148,7 @@ class ChatService:
         session_id: str,
         user_message: str,
         follow_up_responses: list[str] | None = None,
+        knowledge_source_ids: list[str] | None = None,
     ) -> ChatResponse:
         """Full pipeline: store → confidence → RAG → respond.
 
@@ -215,7 +216,10 @@ class ChatService:
             )
 
         # ── 4. MEDIUM / HIGH → RAG search ──────────────────────────────
-        search_results = await self.rag_engine.search(user_message)
+        filters = None
+        if knowledge_source_ids:
+            filters = {"source_id": {"$in": knowledge_source_ids}}
+        search_results = await self.rag_engine.search(user_message, filters=filters)
 
         if not search_results:
             # No docs at all → escalate immediately.
@@ -258,6 +262,7 @@ class ChatService:
         db: AsyncSession,
         session_id: str,
         user_message: str,
+        knowledge_source_ids: list[str] | None = None,
     ) -> AsyncIterator[dict[str, Any]]:
         """Orchestrates the pipeline and yields chunks for streaming."""
         
@@ -298,7 +303,10 @@ class ChatService:
             return
 
         # 6. RAG Search
-        search_results = await self.rag_engine.search(user_message)
+        filters = None
+        if knowledge_source_ids:
+            filters = {"source_id": {"$in": knowledge_source_ids}}
+        search_results = await self.rag_engine.search(user_message, filters=filters)
         if not search_results:
             resp = await self._escalate(db, session_id, user_message, history, "medium")
             yield {"type": "start"}

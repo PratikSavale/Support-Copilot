@@ -1,4 +1,6 @@
 import { create } from 'zustand'
+import axios from 'axios'
+import { API_BASE_URL } from '../config/api'
 
 export interface Message {
   id: string
@@ -15,6 +17,8 @@ interface UserState {
   isStreaming: boolean
   isHistoryLoading: boolean
   isConnected: boolean
+  availableSources: { id: string; title?: string; url: string; status: string }[]
+  selectedSources: string[] // Array of selected source IDs
   
   // Actions
   setSessionId: (id: string) => void
@@ -25,7 +29,13 @@ interface UserState {
   setConnected: (isConnected: boolean) => void
   clearMessages: () => void
   setMessages: (messages: Message[]) => void
+  fetchAvailableSources: () => Promise<void>
+  toggleSourceSelection: (sourceId: string) => void
 }
+
+const api = axios.create({
+  baseURL: API_BASE_URL,
+})
 
 export const useUserStore = create<UserState>((set) => ({
   sessionId: null,
@@ -33,6 +43,8 @@ export const useUserStore = create<UserState>((set) => ({
   isStreaming: false,
   isHistoryLoading: false,
   isConnected: true, // Default to true, update on error
+  availableSources: [],
+  selectedSources: [],
 
   setSessionId: (id) => set({ sessionId: id }),
   
@@ -63,4 +75,24 @@ export const useUserStore = create<UserState>((set) => ({
   clearMessages: () => set({ messages: [] }),
 
   setMessages: (messages) => set({ messages }),
+
+  fetchAvailableSources: async () => {
+    try {
+      const response = await api.get('/knowledge/sources')
+      const sources = response.data.sources || response.data
+      // Filter out only indexed/ready sources if needed, or show all
+      set({ availableSources: sources })
+    } catch (err) {
+      console.error('Failed to load knowledge sources', err)
+    }
+  },
+
+  toggleSourceSelection: (sourceId) => set((state) => {
+    const isSelected = state.selectedSources.includes(sourceId)
+    return {
+      selectedSources: isSelected
+        ? state.selectedSources.filter(id => id !== sourceId)
+        : [...state.selectedSources, sourceId]
+    }
+  }),
 }))
