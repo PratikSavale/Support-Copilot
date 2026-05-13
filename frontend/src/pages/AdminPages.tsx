@@ -1,22 +1,22 @@
 import { useAdminStore } from '../store/adminStore'
 import { StatCard } from '../components/StatCard'
-import { 
-  MessageSquare, 
-  CheckCircle, 
-  AlertCircle, 
-  TrendingUp, 
-  Users, 
+import {
+  MessageSquare,
+  CheckCircle,
+  AlertCircle,
+  TrendingUp,
+  Users,
   Activity,
-  Plus, 
-  Globe, 
-  RefreshCw, 
-  Trash2, 
-  ExternalLink, 
-  Loader2, 
+  Plus,
+  Globe,
+  RefreshCw,
+  Trash2,
+  ExternalLink,
+  Loader2,
   BookOpen,
-  Filter, 
-  Search, 
-  ChevronRight, 
+  Filter,
+  Search,
+  ChevronRight,
   Inbox,
   ShieldAlert
 } from 'lucide-react'
@@ -99,16 +99,16 @@ export const AdminDashboard = () => {
         <h2 className="text-3xl font-bold tracking-tight text-[#f4f4f4]">System Overview</h2>
         <p className="text-sm text-[#c6c6c6] font-medium">Real-time performance metrics and support activity.</p>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {stats.map((stat, index) => (
+        {stats.map((stat) => (
           <StatCard key={stat.title} {...stat} />
         ))}
       </div>
 
       {/* Placeholder for future Charts */}
       <div className="grid grid-cols-1 gap-6">
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           className="h-64 rounded-2xl bg-[#262626] border border-[#393939] p-8 flex flex-col justify-end gap-4"
@@ -118,13 +118,13 @@ export const AdminDashboard = () => {
             <p className="text-sm text-[#c6c6c6]">Knowledge ingestion and query volume trends.</p>
           </div>
           <div className="h-24 w-full flex items-end gap-1">
-             {[...Array(40)].map((_, i) => (
-               <div 
-                 key={i} 
-                 className="flex-1 bg-[#0f62fe]/50 rounded-t-sm hover:bg-[#0f62fe] transition-all cursor-pointer" 
-                 style={{ height: `${Math.random() * 100}%` }}
-               />
-             ))}
+            {[...Array(40)].map((_, i) => (
+              <div
+                key={i}
+                className="flex-1 bg-[#0f62fe]/50 rounded-t-sm hover:bg-[#0f62fe] transition-all cursor-pointer"
+                style={{ height: `${Math.random() * 100}%` }}
+              />
+            ))}
           </div>
         </motion.div>
       </div>
@@ -142,14 +142,14 @@ const AddSourceForm = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!url.trim()) return
-    
+
     await addKnowledgeSource(url.trim(), title.trim() || undefined)
     setUrl('')
     setTitle('')
   }
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       className="p-8 rounded-2xl bg-[#262626] border border-[#393939] space-y-6"
@@ -166,7 +166,7 @@ const AddSourceForm = () => {
           <label className="text-[10px] uppercase tracking-widest font-bold text-[#c6c6c6] ml-1">Documentation URL</label>
           <div className="relative group">
             <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8d8d8d] group-focus-within:text-[#0f62fe] transition-colors" />
-            <input 
+            <input
               type="url"
               value={url}
               onChange={(e) => { setUrl(e.target.value); clearError() }}
@@ -179,7 +179,7 @@ const AddSourceForm = () => {
 
         <div className="flex flex-col gap-2">
           <label className="text-[10px] uppercase tracking-widest font-bold text-[#c6c6c6] ml-1">Friendly Title (Optional)</label>
-          <input 
+          <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -195,7 +195,7 @@ const AddSourceForm = () => {
         )}
 
         <div className="md:col-span-2 flex justify-end">
-          <button 
+          <button
             type="submit"
             disabled={isAddingSource || !url.trim()}
             className="px-6 py-3 rounded-xl bg-[#0f62fe] text-[#ffffff] text-xs font-bold uppercase tracking-widest hover:bg-[#0043ce] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 shadow-sm"
@@ -242,14 +242,14 @@ const SourceList = () => {
       <div className="flex items-center justify-between px-2">
         <h3 className="text-sm font-bold text-[#c6c6c6] uppercase tracking-widest">Active Sources ({knowledgeSources.length})</h3>
       </div>
-      
+
       <div className="space-y-3">
         {knowledgeSources.map((source, index) => (
-          <motion.div 
+          <motion.div
             layout
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            key={`${source.id}-${index}`} 
+            key={`${source.id}-${index}`}
             className="p-5 rounded-2xl bg-[#262626] border border-[#393939] flex items-center justify-between group hover:bg-[#393939] transition-all"
           >
             <div className="flex items-center gap-4 flex-1 min-w-0">
@@ -274,7 +274,7 @@ const SourceList = () => {
             </div>
 
             <div className="flex items-center gap-2 ml-6">
-              <button 
+              <button
                 onClick={() => reindexSource(source.id)}
                 disabled={isRefreshing === source.id}
                 className="p-2.5 rounded-xl bg-[#161616] border border-[#393939] text-[#c6c6c6] hover:text-[#f4f4f4] hover:bg-[#393939] transition-all disabled:opacity-50"
@@ -282,14 +282,14 @@ const SourceList = () => {
               >
                 <RefreshCw className={`w-4 h-4 ${isRefreshing === source.id ? 'animate-spin' : ''}`} />
               </button>
-              <button 
+              <button
                 onClick={() => window.open(source.url, '_blank')}
                 className="p-2.5 rounded-xl bg-[#161616] border border-[#393939] text-[#c6c6c6] hover:text-[#f4f4f4] hover:bg-[#393939] transition-all"
                 title="Open Original Source"
               >
                 <ExternalLink className="w-4 h-4" />
               </button>
-              <button 
+              <button
                 onClick={() => deleteKnowledgeSource(source.id)}
                 className="p-2.5 rounded-xl bg-[#161616] border border-[#393939] text-[#da1e28]/70 hover:text-[#da1e28] hover:bg-[#da1e28]/20 transition-all"
                 title="Delete Source"
@@ -312,7 +312,7 @@ export const KnowledgePage = () => {
         <h2 className="text-3xl font-bold tracking-tight text-[#f4f4f4]">Knowledge Base</h2>
         <p className="text-sm text-[#c6c6c6] font-medium">Curate and maintain the data that powers your AI's intelligence.</p>
       </div>
-      
+
       <AddSourceForm />
       <SourceList />
     </div>
@@ -328,8 +328,8 @@ const TicketFilters = () => {
     <div className="flex flex-wrap items-center gap-4">
       <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#262626] border border-[#393939]">
         <Filter className="w-3.5 h-3.5 text-[#c6c6c6]" />
-        <select 
-          value={filterStatus || ''} 
+        <select
+          value={filterStatus || ''}
           onChange={(e) => setFilterStatus(e.target.value || null)}
           className="bg-transparent text-xs font-bold text-[#c6c6c6] focus:outline-none cursor-pointer uppercase tracking-widest"
         >
@@ -342,8 +342,8 @@ const TicketFilters = () => {
 
       <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#262626] border border-[#393939]">
         <ShieldAlert className="w-3.5 h-3.5 text-[#c6c6c6]" />
-        <select 
-          value={filterSeverity || ''} 
+        <select
+          value={filterSeverity || ''}
           onChange={(e) => setFilterSeverity(e.target.value || null)}
           className="bg-transparent text-xs font-bold text-[#c6c6c6] focus:outline-none cursor-pointer uppercase tracking-widest"
         >
@@ -354,10 +354,10 @@ const TicketFilters = () => {
           <option value="low">Low</option>
         </select>
       </div>
-      
+
       <div className="flex-1 min-w-[200px] relative group">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8d8d8d] group-focus-within:text-[#0f62fe] transition-colors" />
-        <input 
+        <input
           type="text"
           placeholder="Search tickets by summary or ID..."
           className="w-full bg-[#161616] border border-[#393939] rounded-xl py-2 pl-12 pr-4 text-xs text-[#f4f4f4] focus:outline-none focus:border-[#0f62fe] focus:bg-[#262626] transition-all"
@@ -409,39 +409,39 @@ const TicketTable = () => {
         </thead>
         <tbody className="divide-y divide-[#393939]">
           {tickets.map((ticket, index) => (
-            <motion.tr 
+            <motion.tr
               key={`${ticket.id}-${index}`}
               onClick={() => openTicketDetail(ticket)}
               className="hover:bg-[#393939] cursor-pointer transition-colors group"
             >
               <td className="px-6 py-4">
                 <div className="flex flex-col gap-0.5 max-w-md">
-                   <span className="text-xs font-bold text-[#f4f4f4] group-hover:text-white transition-colors truncate">
-                     {ticket.summary}
-                   </span>
-                   <span className="text-[10px] text-[#8d8d8d] uppercase tracking-widest font-bold">
-                     {ticket.jira_issue_key || ticket.id.slice(0, 8)}
-                   </span>
+                  <span className="text-xs font-bold text-[#f4f4f4] group-hover:text-white transition-colors truncate">
+                    {ticket.summary}
+                  </span>
+                  <span className="text-[10px] text-[#8d8d8d] uppercase tracking-widest font-bold">
+                    {ticket.jira_issue_key || ticket.id.slice(0, 8)}
+                  </span>
                 </div>
               </td>
               <td className="px-6 py-4">
-                 <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border
-                  ${ticket.severity === 'critical' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 
+                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border
+                  ${ticket.severity === 'critical' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
                     ticket.severity === 'high' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
-                    'bg-blue-500/10 text-blue-400 border-blue-500/20'}`}
-                 >
-                   {ticket.severity}
-                 </span>
+                      'bg-blue-500/10 text-blue-400 border-blue-500/20'}`}
+                >
+                  {ticket.severity}
+                </span>
               </td>
               <td className="px-6 py-4">
-                 <span className="text-[10px] text-[#c6c6c6] font-bold uppercase tracking-widest">
-                   {ticket.status}
-                 </span>
+                <span className="text-[10px] text-[#c6c6c6] font-bold uppercase tracking-widest">
+                  {ticket.status}
+                </span>
               </td>
               <td className="px-6 py-4">
-                 <span className="text-[10px] text-[#8d8d8d] font-bold uppercase tracking-widest">
-                   {new Date(ticket.created_at).toLocaleDateString()}
-                 </span>
+                <span className="text-[10px] text-[#8d8d8d] font-bold uppercase tracking-widest">
+                  {new Date(ticket.created_at).toLocaleDateString()}
+                </span>
               </td>
               <td className="px-6 py-4 text-right">
                 <ChevronRight className="w-4 h-4 text-[#393939] group-hover:text-[#0f62fe] group-hover:translate-x-1 transition-all inline-block" />
@@ -472,9 +472,9 @@ export const TicketsPage = () => {
 
       <AnimatePresence>
         {selectedTicket && (
-          <TicketDetail 
-            ticket={selectedTicket} 
-            onClose={closeTicketDetail} 
+          <TicketDetail
+            ticket={selectedTicket}
+            onClose={closeTicketDetail}
           />
         )}
       </AnimatePresence>
