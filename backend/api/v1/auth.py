@@ -24,6 +24,7 @@ async def register(user_data: UserRegister, db: AsyncSession = Depends(get_db)):
         user_data.password, 
         user_data.role or UserRole.agent
     )
+    await db.commit()
     return user
 
 @router.post("/login", response_model=Token)
