@@ -1,5 +1,12 @@
+import sys
 import asyncio
 from sqlalchemy import text
+from pathlib import Path
+
+_BACKEND_ROOT = Path(__file__).resolve().parent.parent
+if str(_BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(_BACKEND_ROOT))
+
 from config.database import engine
 from models.base import Base
 import models # ensure all models are imported
