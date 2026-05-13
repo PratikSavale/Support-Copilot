@@ -1,5 +1,5 @@
 import { X, ExternalLink, Calendar, Tag, ShieldAlert } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import type { Ticket } from '../store/adminStore'
 
 interface TicketDetailProps {
@@ -10,15 +10,15 @@ interface TicketDetailProps {
 export const TicketDetail = ({ ticket, onClose }: TicketDetailProps) => {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
         className="absolute inset-0 bg-[#161616]/80 backdrop-blur-sm"
       />
-      
-      <motion.div 
+
+      <motion.div
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -35,7 +35,7 @@ export const TicketDetail = ({ ticket, onClose }: TicketDetailProps) => {
               <p className="text-[10px] text-[#c6c6c6] uppercase tracking-widest font-bold">Ref: {ticket.jira_issue_key || ticket.id.slice(0, 8)}</p>
             </div>
           </div>
-          <button 
+          <button
             onClick={onClose}
             className="p-2 rounded-xl hover:bg-[#393939] text-[#c6c6c6] hover:text-[#f4f4f4] transition-all"
           >
@@ -46,19 +46,19 @@ export const TicketDetail = ({ ticket, onClose }: TicketDetailProps) => {
         {/* Content */}
         <div className="p-8 space-y-8 max-h-[70vh] overflow-y-auto custom-scrollbar">
           <div className="space-y-4">
-             <div className="flex items-center gap-3">
-                <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border
-                  ${ticket.severity === 'critical' ? 'bg-[#da1e28]/10 text-[#da1e28] border-[#da1e28]/20' : 
-                    ticket.severity === 'high' ? 'bg-[#ff832b]/10 text-[#ff832b] border-[#ff832b]/20' :
+            <div className="flex items-center gap-3">
+              <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border
+                  ${ticket.severity === 'critical' ? 'bg-[#da1e28]/10 text-[#da1e28] border-[#da1e28]/20' :
+                  ticket.severity === 'high' ? 'bg-[#ff832b]/10 text-[#ff832b] border-[#ff832b]/20' :
                     'bg-[#0f62fe]/10 text-[#0f62fe] border-[#0f62fe]/20'}`}
-                >
-                  {ticket.severity}
-                </span>
-                <span className="px-3 py-1 rounded-full bg-[#161616] border border-[#393939] text-[#c6c6c6] text-[10px] font-bold uppercase tracking-wider">
-                  {ticket.status}
-                </span>
-             </div>
-             <h2 className="text-2xl font-bold text-[#f4f4f4] leading-tight">{ticket.summary}</h2>
+              >
+                {ticket.severity}
+              </span>
+              <span className="px-3 py-1 rounded-full bg-[#161616] border border-[#393939] text-[#c6c6c6] text-[10px] font-bold uppercase tracking-wider">
+                {ticket.status}
+              </span>
+            </div>
+            <h2 className="text-2xl font-bold text-[#f4f4f4] leading-tight">{ticket.summary}</h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -83,10 +83,10 @@ export const TicketDetail = ({ ticket, onClose }: TicketDetailProps) => {
           </div>
 
           <div className="space-y-3">
-             <label className="text-[10px] uppercase tracking-widest font-bold text-[#c6c6c6]">Issue Context</label>
-             <div className="p-6 rounded-2xl bg-[#161616] border border-[#393939] text-sm text-[#c6c6c6] leading-relaxed whitespace-pre-wrap italic">
-               "System automatically escalated this session due to high complexity and critical severity keywords detected in user input."
-             </div>
+            <label className="text-[10px] uppercase tracking-widest font-bold text-[#c6c6c6]">Issue Context</label>
+            <div className="p-6 rounded-2xl bg-[#161616] border border-[#393939] text-sm text-[#c6c6c6] leading-relaxed whitespace-pre-wrap italic">
+              "System automatically escalated this session due to high complexity and critical severity keywords detected in user input."
+            </div>
           </div>
         </div>
 
@@ -96,14 +96,14 @@ export const TicketDetail = ({ ticket, onClose }: TicketDetailProps) => {
             Jira Sync: <span className="text-[#24a148] font-bold uppercase">Healthy</span>
           </div>
           <div className="flex items-center gap-3">
-            <button 
+            <button
               onClick={onClose}
               className="px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest text-[#c6c6c6] hover:text-[#f4f4f4] transition-colors"
             >
               Close
             </button>
             {ticket.jira_issue_key && (
-              <a 
+              <a
                 href={`https://your-domain.atlassian.net/browse/${ticket.jira_issue_key}`}
                 target="_blank"
                 rel="noopener noreferrer"
