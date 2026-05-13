@@ -21,9 +21,144 @@ import {
   ShieldAlert
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { StatusBadge } from '../components/StatusBadge'
 import { TicketDetail } from '../components/TicketDetail'
+import axios from 'axios'
+import { API_BASE_URL } from '../config/api'
+
+// --- Sub-component: ManualEscalateModal ---
+const ManualEscalateModal = ({ onClose }: { onClose: () => void }) => {
+  const { loadIssueTypes, loadTickets } = useAdminStore()
+  const [sessions, setSessions] = useState<any[]>([])
+  const [issueTypes, setIssueTypes] = useState<any[]>([])
+  const [selectedSession, setSelectedSession] = useState('')
+  const [selectedIssueType, setSelectedIssueType] = useState('Bug')
+  const [isEscalating, setIsEscalating] = useState(false)
+  const [isLoadingData, setIsLoadingData] = useState(true)
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [sessionsRes, types] = await Promise.all([
+          axios.get(`${API_BASE_URL}/chat/sessions`),
+          loadIssueTypes()
+        ])
+        setSessions(sessionsRes.data.sessions || sessionsRes.data)
+        setIssueTypes(types)
+        if (types.length > 0) setSelectedIssueType(types[0].name)
+      } catch (err) {
+        console.error('Failed to load escalation data', err)
+      } finally {
+        setIsLoadingData(false)
+      }
+    }
+    fetchData()
+  }, [loadIssueTypes])
+
+  const handleEscalate = async () => {
+    if (!selectedSession) return
+    setIsEscalating(true)
+    try {
+      await axios.post(`${API_BASE_URL}/tickets/escalate`, {
+        session_id: selectedSession,
+        issue_type: selectedIssueType
+      })
+      await loadTickets()
+      onClose()
+    } catch (err) {
+      console.error('Escalation failed', err)
+    } finally {
+      setIsEscalating(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="absolute inset-0 bg-[#161616]/90 backdrop-blur-md"
+      />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="relative w-full max-w-lg bg-[#262626] border border-[#393939] rounded-3xl p-8 space-y-8 shadow-2xl"
+      >
+        <div className="flex items-center gap-4">
+          <div className="p-3 rounded-2xl bg-[#0f62fe]/20">
+            <ShieldAlert className="w-6 h-6 text-[#0f62fe]" />
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-[#f4f4f4]">Manual Escalation</h3>
+            <p className="text-xs text-[#c6c6c6]">Convert a chat session into a Jira ticket.</p>
+          </div>
+        </div>
+
+        {isLoadingData ? (
+          <div className="py-12 flex justify-center">
+            <Loader2 className="w-8 h-8 text-[#0f62fe] animate-spin" />
+          </div>
+        ) : (
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <label className="text-[10px] uppercase tracking-widest font-bold text-[#c6c6c6] ml-1">Select Session</label>
+              <select
+                value={selectedSession}
+                onChange={(e) => setSelectedSession(e.target.value)}
+                className="w-full bg-[#161616] border border-[#393939] rounded-xl py-3 px-4 text-sm text-[#f4f4f4] focus:outline-none focus:border-[#0f62fe]"
+              >
+                <option value="">Choose a session...</option>
+                {sessions.map(s => (
+                  <option key={s.id} value={s.id}>{s.title || 'Untitled'} ({s.id.slice(0,8)})</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] uppercase tracking-widest font-bold text-[#c6c6c6] ml-1">Jira Issue Type</label>
+              <div className="grid grid-cols-2 gap-3">
+                {issueTypes.map(type => (
+                  <button
+                    key={type.id}
+                    onClick={() => setSelectedIssueType(type.name)}
+                    className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
+                      selectedIssueType === type.name 
+                        ? 'bg-[#0f62fe]/10 border-[#0f62fe] text-[#0f62fe]' 
+                        : 'bg-[#161616] border-[#393939] text-[#c6c6c6] hover:border-[#525252]'
+                    }`}
+                  >
+                    {type.iconUrl && <img src={type.iconUrl} alt="" className="w-4 h-4" />}
+                    <span className="text-xs font-bold">{type.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-center gap-4 pt-4">
+          <button
+            onClick={onClose}
+            className="flex-1 py-3 text-xs font-bold uppercase tracking-widest text-[#c6c6c6] hover:text-[#f4f4f4] transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleEscalate}
+            disabled={!selectedSession || isEscalating}
+            className="flex-[2] py-3 rounded-xl bg-[#0f62fe] text-white text-xs font-bold uppercase tracking-widest hover:bg-[#0043ce] disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+          >
+            {isEscalating && <Loader2 className="w-4 h-4 animate-spin" />}
+            {isEscalating ? 'Escalating...' : 'Create Jira Ticket'}
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  )
+}
 
 export const AdminDashboard = () => {
   const { metrics, isLoading, error } = useAdminStore()
@@ -457,12 +592,22 @@ const TicketTable = () => {
 // --- Main Page Component ---
 export const TicketsPage = () => {
   const { selectedTicket, closeTicketDetail } = useAdminStore()
+  const [showEscalateModal, setShowEscalateModal] = useState(false)
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-3xl font-bold tracking-tight text-[#f4f4f4]">Ticket Oversight</h2>
-        <p className="text-sm text-[#c6c6c6] font-medium">Review, track, and manage escalated support requests.</p>
+      <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-3xl font-bold tracking-tight text-[#f4f4f4]">Ticket Oversight</h2>
+          <p className="text-sm text-[#c6c6c6] font-medium">Review, track, and manage escalated support requests.</p>
+        </div>
+        <button
+          onClick={() => setShowEscalateModal(true)}
+          className="px-6 py-3 rounded-xl bg-[#0f62fe] text-white text-xs font-bold uppercase tracking-widest hover:bg-[#0043ce] transition-all flex items-center gap-2 shadow-lg shadow-[#0f62fe]/20"
+        >
+          <Plus className="w-4 h-4" />
+          Manual Escalation
+        </button>
       </div>
 
       <div className="space-y-6">
@@ -476,6 +621,9 @@ export const TicketsPage = () => {
             ticket={selectedTicket}
             onClose={closeTicketDetail}
           />
+        )}
+        {showEscalateModal && (
+          <ManualEscalateModal onClose={() => setShowEscalateModal(false)} />
         )}
       </AnimatePresence>
     </div>
