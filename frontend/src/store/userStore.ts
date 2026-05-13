@@ -2,6 +2,13 @@ import { create } from 'zustand'
 import axios from 'axios'
 import { API_BASE_URL } from '../config/api'
 
+export interface SourceInfo {
+  source_id: string
+  title: string
+  chunk_excerpt: string
+  url?: string
+}
+
 export interface Message {
   id: string
   role: 'user' | 'assistant'
@@ -9,6 +16,7 @@ export interface Message {
   timestamp: string
   action?: 'resolve' | 'clarification' | 'escalated'
   suggestions?: string[]
+  sources?: SourceInfo[]
 }
 
 export interface Session {

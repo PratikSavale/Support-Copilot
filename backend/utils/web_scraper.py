@@ -19,13 +19,13 @@ class WebScraper:
         self.timeout = timeout
 
     async def fetch_content(self, url: str) -> str:
-        """Fetch a URL and return cleaned text content.
+        """Fetch a URL and return cleaned text content using Jina AI Reader.
 
         Args:
             url: The URL to fetch.
 
         Returns:
-            Cleaned plain-text content.
+            Cleaned plain-text (markdown) content.
 
         Raises:
             httpx.HTTPStatusError: On non-2xx responses.
@@ -34,9 +34,9 @@ class WebScraper:
             "User-Agent": "Mozilla/5.0 (compatible; CopilotBot/1.0)",
         }
         async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
-            response = await client.get(url, headers=headers)
+            response = await client.get(f"https://r.jina.ai/{url}", headers=headers)
             response.raise_for_status()
-            return self._parse_html(response.text)
+            return response.text
 
     # ------------------------------------------------------------------
     # Crawling functionality
@@ -59,9 +59,12 @@ class WebScraper:
         """
         import asyncio
         import logging
-        from urllib.parse import urljoin, urldefrag
+        from urllib.parse import urlparse, urljoin, urldefrag
 
         logger = logging.getLogger(__name__)
+
+        parsed_start = urlparse(start_url)
+        base_domain = f"{parsed_start.scheme}://{parsed_start.netloc}"
 
         visited: set[str] = {start_url}
         queue: list[str] = [start_url]
@@ -73,8 +76,14 @@ class WebScraper:
             """Fetch a single page and extract its text + discovered links."""
             async with semaphore:
                 try:
-                    response = await client.get(url, headers=headers)
-                    response.raise_for_status()
+                    # 1. Fetch raw HTML (Fast, good for legacy framesets like Java Docs)
+                    raw_resp = await client.get(url, headers=headers)
+                    html = raw_resp.text
+                    
+                    # 2. Fetch Jina AI Markdown (Executes JS, good for React SPAs)
+                    jina_resp = await client.get(f"https://r.jina.ai/{url}", headers=headers)
+                    text = jina_resp.text
+                    
                 except httpx.HTTPStatusError as exc:
                     logger.warning("HTTP %s for %s", exc.response.status_code, url)
                     return "", []
@@ -82,26 +91,40 @@ class WebScraper:
                     logger.warning("Failed to fetch %s: %s", url, exc)
                     return "", []
 
-                html = response.text
-                soup = BeautifulSoup(html, "html.parser")
-
-                # --- extract links ---
                 new_urls: list[str] = []
+                
+                # --- extract links from raw HTML ---
+                soup = BeautifulSoup(html, "html.parser")
                 for tag in soup.find_all(["a", "frame", "iframe"]):
                     href = tag.get("href") or tag.get("src")
                     if href:
                         abs_url = urljoin(url, href)
                         abs_url, _ = urldefrag(abs_url)
-                        if abs_url.startswith(start_url):
+                        if abs_url.startswith(base_domain):
                             new_urls.append(abs_url)
 
-                # --- extract text ---
-                for tag in soup(["script", "style", "nav", "footer", "header", "aside", "noscript"]):
-                    tag.decompose()
-                text = soup.get_text(separator="\n")
-                lines = (line.strip() for line in text.splitlines())
-                text = "\n".join(line for line in lines if line)
-                text = re.sub(r"\n{3,}", "\n\n", text).strip()
+                # --- extract links from Jina Markdown (for React/JS SPAs) ---
+                for match in re.finditer(r'\]\((https?://[^\s\)]+)\)', text):
+                    abs_url = match.group(1)
+                    abs_url, _ = urldefrag(abs_url)
+                    if abs_url.startswith(base_domain):
+                        new_urls.append(abs_url)
+
+                # --- Storybook SPA Heuristic ---
+                # Storybook loads its actual content inside an iframe. If we detect a Storybook URL,
+                # we also fetch the iframe content directly to ensure we don't just index the sidebar.
+                storybook_match = re.search(r'\?path=/docs/(.*?)$', url)
+                if storybook_match:
+                    try:
+                        story_id = storybook_match.group(1).replace('--docs', '').replace('&viewMode=docs', '')
+                        iframe_url = urljoin(url, f"/iframe.html?id={story_id}&viewMode=docs")
+                        logger.info("Detected Storybook URL. Fetching iframe content: %s", iframe_url)
+                        iframe_resp = await client.get(f"https://r.jina.ai/{iframe_url}", headers=headers)
+                        if iframe_resp.status_code == 200 and iframe_resp.text:
+                            # Append the iframe content to the shell text so we capture the actual component info
+                            text += "\n\n" + iframe_resp.text
+                    except Exception as e:
+                        logger.warning("Failed to fetch Storybook iframe for %s: %s", url, e)
 
                 # Small delay per request to be polite to the server.
                 await asyncio.sleep(0.3)

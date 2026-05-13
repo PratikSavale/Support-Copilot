@@ -27,7 +27,7 @@ class RAGEngine:
         self.collection = get_collection(client, settings.CHROMA_COLLECTION)
 
     async def add_documents(
-        self, source_id: str, source_title: str, chunks: list[str]
+        self, source_id: str, source_title: str, chunks: list[str], source_url: str = ""
     ) -> int:
         if not chunks:
             return 0
@@ -43,6 +43,9 @@ class RAGEngine:
             }
             for i in range(len(chunks))
         ]
+        for meta in metadatas:
+            if source_url:
+                meta["source_url"] = source_url
 
         # Use upsert so re-indexing same source does not fail on duplicate IDs.
         self.collection.upsert(
@@ -93,10 +96,12 @@ class RAGEngine:
             {
                 "role": "user",
                 "content": (
-                    "Based on the documentation below, answer the user question.\n\n"
+                    "You are an expert, context-aware L2 Support AI. Analyze the provided documentation to interpret and deduce the answer to the user's question. "
+                    "You may apply the concepts from the documentation to troubleshoot specific errors (like Java stack traces), but you MUST base your reasoning on the provided text. "
+                    "Do not hallucinate outside facts. If the documentation does not contain enough relevant information to deduce a helpful answer, "
+                    "you MUST reply EXACTLY with the phrase 'INSUFFICIENT_DOCUMENTATION'.\n\n"
                     f"Documentation:\n{context}\n\n"
-                    f"User Question: {query}\n\n"
-                    "If documentation is insufficient, explicitly say so."
+                    f"User Question: {query}"
                 ),
             }
         ]
@@ -108,30 +113,71 @@ class RAGEngine:
     async def generate_response(
         self, query: str, context_docs: list[dict[str, Any]]
     ) -> tuple[str, list[dict[str, Any]]]:
-        context = "\n\n".join(doc.get("content", "") for doc in context_docs)
-        messages = [
-            {
-                "role": "user",
-                "content": (
-                    "Based on the documentation below, answer the user question.\n\n"
-                    f"Documentation:\n{context}\n\n"
-                    f"User Question: {query}\n\n"
-                    "If documentation is insufficient, explicitly say so."
-                ),
-            }
-        ]
-        response = await self.llm_engine.generate_response(
-            messages, system_prompt=CHAT_SYSTEM_PROMPT
-        )
+        accumulated_docs = {doc.get("id"): doc for doc in context_docs}
+        search_history = [query]
+        
+        max_hops = 3
+        for hop in range(max_hops):
+            context = "\n\n".join(doc.get("content", "") for doc in accumulated_docs.values())
+            prompt = (
+                "You are an expert, context-aware L2 Support AI equipped with Graph Traversal reasoning.\n"
+                "You must analyze the user's question and the retrieved documentation.\n"
+                f"Documentation:\n{context}\n\n"
+                f"User Question: {query}\n\n"
+                "If the documentation provides enough context to deduce the answer, reply with action 'answer' and the content.\n"
+                "If the documentation is missing pieces (e.g. you see a concept but need to know its configuration), you can trigger another search by replying with action 'search' and the new query content.\n"
+                "If you cannot deduce the answer and cannot think of anything else to search, reply with action 'insufficient'.\n"
+                "Do NOT use outside knowledge.\n"
+            )
+            schema_hint = '{"action": "answer" | "search" | "insufficient", "content": "your response or your next search query"}'
+            
+            import logging
+            logger = logging.getLogger(__name__)
+            
+            structured_resp = await self.llm_engine.generate_structured_response(prompt, schema_hint)
+            
+            action = structured_resp.get("action")
+            content = structured_resp.get("content", "")
+            
+            if action == "answer" and content:
+                logger.info(f"🟢 [Agentic RAG] Deduced answer on hop {hop+1}")
+                # Deduplicate and return
+                sources = [
+                    {
+                        "source_id": str(doc.get("metadata", {}).get("source_id", "")),
+                        "title": str(doc.get("metadata", {}).get("source_title", "")),
+                        "url": str(doc.get("metadata", {}).get("source_url", "")),
+                        "chunk_excerpt": truncate_excerpt(doc.get("content", "")),
+                    }
+                    for doc in accumulated_docs.values()
+                ]
+                return content, sources
+                
+            elif action == "search" and content and content not in search_history:
+                logger.info(f"🔍 [Agentic RAG] Hop {hop+1}: Missing context. Triggering graph search for -> '{content}'")
+                # Execute the hop!
+                new_docs = await self.search(content, top_k=3)
+                for nd in new_docs:
+                    accumulated_docs[nd.get("id")] = nd
+                search_history.append(content)
+                continue # Next hop
+                
+            else:
+                logger.warning(f"🔴 [Agentic RAG] Hop {hop+1}: Reached dead end or insufficient context. Falling back.")
+                # Either insufficient, or empty/malformed due to API error
+                break
+                
+        # If we exhausted hops or hit insufficient/error
         sources = [
             {
                 "source_id": str(doc.get("metadata", {}).get("source_id", "")),
                 "title": str(doc.get("metadata", {}).get("source_title", "")),
+                "url": str(doc.get("metadata", {}).get("source_url", "")),
                 "chunk_excerpt": truncate_excerpt(doc.get("content", "")),
             }
-            for doc in context_docs
+            for doc in accumulated_docs.values()
         ]
-        return response, sources
+        return "INSUFFICIENT_DOCUMENTATION", sources
 
     async def process_query(self, query: str) -> dict[str, Any]:
         context_docs = await self.search(query)

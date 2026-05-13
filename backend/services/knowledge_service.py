@@ -137,6 +137,7 @@ class KnowledgeService:
                     source_id=str(source_id),
                     source_title=source.title or source.url,
                     chunks=chunks,
+                    source_url=source.url,
                 )
 
                 # 4. Update source record.

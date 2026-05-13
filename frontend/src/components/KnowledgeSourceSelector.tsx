@@ -34,10 +34,10 @@ export const KnowledgeSourceSelector = () => {
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
           "flex items-center gap-2 px-4 py-2 rounded-xl border transition-all text-xs font-bold uppercase tracking-widest",
-          selectedSources.length > 0
-            ? "bg-nebula-blue/20 border-nebula-blue/30 text-nebula-blue"
-            : "bg-white/5 border-white/10 text-white/40 hover:bg-white/10 hover:text-white/80"
-        )}
+            selectedSources.length > 0
+              ? "bg-[#0f62fe]/10 border-[#0f62fe]/20 text-[#0f62fe]"
+              : "bg-white border-[#e0e0e0] text-[#525252] hover:bg-[#f4f4f4] hover:text-[#161616] shadow-sm"
+          )}
       >
         <BookOpen className="w-4 h-4" />
         <span>
@@ -55,11 +55,11 @@ export const KnowledgeSourceSelector = () => {
             animate={{ opacity: 1, y: 0, scale: 1, x: "-50%" }}
             exit={{ opacity: 0, y: 8, scale: 0.95, x: "-50%" }}
             transition={{ duration: 0.15 }}
-            className="absolute top-full mt-3 left-1/2 w-72 bg-[#0B0F19]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl shadow-black/80 z-[100] overflow-hidden flex flex-col"
+            className="absolute top-full mt-3 left-1/2 w-72 bg-white border border-[#e0e0e0] rounded-2xl shadow-xl z-[100] overflow-hidden flex flex-col"
           >
-            <div className="px-4 py-3 border-b border-white/5 bg-white/5">
-              <h4 className="text-[10px] text-white/40 font-bold uppercase tracking-widest">Select Context</h4>
-              <p className="text-[10px] text-white/30 mt-0.5">Filter answers by source</p>
+            <div className="px-4 py-3 border-b border-[#e0e0e0] bg-[#f4f4f4]">
+              <h4 className="text-[10px] text-[#525252] font-bold uppercase tracking-widest">Select Context</h4>
+              <p className="text-[10px] text-[#a8a8a8] mt-0.5">Filter answers by source</p>
             </div>
             <div className="max-h-60 overflow-y-auto p-2 flex flex-col gap-1">
               {readySources.map((source) => {
@@ -71,8 +71,8 @@ export const KnowledgeSourceSelector = () => {
                     className={cn(
                       "flex items-center justify-between w-full px-3 py-2.5 rounded-xl text-left transition-all",
                       isSelected
-                        ? "bg-nebula-blue/10 text-nebula-blue"
-                        : "text-white/60 hover:bg-white/5 hover:text-white"
+                        ? "bg-[#0f62fe]/10 text-[#0f62fe]"
+                        : "text-[#525252] hover:bg-[#f4f4f4] hover:text-[#161616]"
                     )}
                   >
                     <div className="flex flex-col min-w-0 pr-2">
@@ -83,8 +83,8 @@ export const KnowledgeSourceSelector = () => {
                     <div className={cn(
                       "w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-colors",
                       isSelected 
-                        ? "bg-nebula-blue border-nebula-blue text-white" 
-                        : "border-white/20"
+                        ? "bg-[#0f62fe] border-[#0f62fe] text-white" 
+                        : "border-[#c6c6c6]"
                     )}>
                       {isSelected && <Check className="w-3 h-3" />}
                     </div>
@@ -93,14 +93,14 @@ export const KnowledgeSourceSelector = () => {
               })}
             </div>
             {selectedSources.length > 0 && (
-              <div className="p-2 border-t border-white/5">
+              <div className="p-2 border-t border-[#e0e0e0] bg-[#f4f4f4]">
                 <button
                   onClick={() => {
                     // Clear all by toggling them off
                     selectedSources.forEach(id => toggleSourceSelection(id))
                     setIsOpen(false)
                   }}
-                  className="w-full py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/40 hover:text-white/80 text-xs font-bold uppercase tracking-widest transition-colors"
+                  className="w-full py-2 rounded-xl bg-white border border-[#e0e0e0] hover:bg-[#e0e0e0] text-[#525252] hover:text-[#161616] text-xs font-bold uppercase tracking-widest transition-colors shadow-sm"
                 >
                   Clear Selection
                 </button>
