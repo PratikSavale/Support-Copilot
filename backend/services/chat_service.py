@@ -343,7 +343,7 @@ class ChatService:
         filters = None
         if knowledge_source_ids:
             filters = {"source_id": {"$in": knowledge_source_ids}}
-        logger.info(f"[DEBUG] RAG search for query: '{user_message[:100]}'")
+        logger.debug(f"RAG search for query: '{user_message[:100]}' ")
         search_results = await self.rag_engine.search(user_message, filters=filters)
         logger.info(f"[DEBUG] RAG returned {len(search_results) if search_results else 0} results")
         if not search_results:
