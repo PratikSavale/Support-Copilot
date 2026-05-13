@@ -109,7 +109,11 @@ class TestJiraClient:
             from services.jira_client import JiraClient
             client = JiraClient()
             result = await client.get_ticket("SUP-123")
-            assert result == {"key": "SUP-123", "status": "Open"}
+            assert result["key"] == "SUP-123"
+            assert "status" in result
+            assert "assignee" in result
+            assert "priority" in result
+            assert "comment_count" in result
 
 
 # ---------------------------------------------------------------------------

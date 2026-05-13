@@ -105,12 +105,14 @@ class TicketService:
         await db.flush()
 
         # Sync to Jira (best-effort — never block on failure).
+        logger.info(f"[JIRA] Attempting to create ticket in Jira: summary='{ticket.summary[:50]}', jira_client.use_mock={self.jira_client.use_mock}, jira_client.is_configured={self.jira_client.is_configured}")
         try:
             jira_response = await self.jira_client.create_ticket(ticket)
+            logger.info(f"[JIRA] Jira ticket created successfully: {jira_response}")
             ticket.jira_issue_key = jira_response.get("key")
             ticket.jira_issue_id = str(jira_response.get("id", ""))
         except Exception as exc:
-            logger.warning("Jira ticket creation failed: %s", exc)
+            logger.warning("[JIRA] Jira ticket creation failed: %s", exc, exc_info=True)
 
         await db.flush()
         await db.refresh(ticket)

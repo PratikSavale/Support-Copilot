@@ -343,8 +343,11 @@ class ChatService:
         filters = None
         if knowledge_source_ids:
             filters = {"source_id": {"$in": knowledge_source_ids}}
+        logger.info(f"[DEBUG] RAG search for query: '{user_message[:100]}'")
         search_results = await self.rag_engine.search(user_message, filters=filters)
+        logger.info(f"[DEBUG] RAG returned {len(search_results) if search_results else 0} results")
         if not search_results:
+            logger.info(f"[DEBUG] No RAG results -> ESCALATING to ticket")
             resp = await self._escalate(db, session_id, user_message, history, "medium")
             yield {"type": "chunk", "content": resp.response, "is_final": True}
             yield {
@@ -360,10 +363,13 @@ class ChatService:
             query=user_message,
             retrieved_docs=search_results,
         )
+        logger.info(f"[DEBUG] Post-retrieval confidence: score={post.get('score')}, action={post.get('action')}, retrieval={post.get('retrieval_score')}, relevance={post.get('relevance_score')}, completeness={post.get('completeness_score')}")
 
         # 8. Attempt RAG if resolve
         if post["action"] == "resolve":
+            logger.info(f"[DEBUG] Post-retrieval action=resolve, attempting RAG response generation")
             full_response, sources = await self.rag_engine.generate_response(user_message, search_results)
+            logger.info(f"[DEBUG] RAG response (first 200 chars): {full_response[:200]}")
             
             if "INSUFFICIENT_DOCUMENTATION" not in full_response:
                 # Regular RAG worked!
@@ -384,14 +390,17 @@ class ChatService:
                 return
 
         # 9. Fallback: Either post["action"] != "resolve" OR INSUFFICIENT_DOCUMENTATION
+        logger.info(f"[DEBUG] Fallback path triggered, calling LLM for general knowledge")
         fallback_prompt = (
             "Answer the following technical support or programming question based on your general knowledge. "
             "If you do not know the answer or are not highly confident, you MUST reply EXACTLY with 'I_DONT_KNOW'.\n\n"
             f"Question: {user_message}"
         )
         fallback_response = await self.rag_engine.llm_engine.generate_response([{"role": "user", "content": fallback_prompt}])
+        logger.info(f"[DEBUG] Fallback LLM response (first 200 chars): {fallback_response[:200]}")
         
         if "I_DONT_KNOW" in fallback_response or "Mocked Response" in fallback_response:
+            logger.info(f"[DEBUG] Fallback LLM said I_DONT_KNOW -> ESCALATING to ticket")
             # Base LLM also doesn't know -> Escalate to ticket
             resp = await self._escalate(db, session_id, user_message, history, "high")
             yield {"type": "chunk", "content": resp.response, "is_final": True}
@@ -403,6 +412,7 @@ class ChatService:
             }
             return
         else:
+            logger.info(f"[DEBUG] Fallback LLM returned answer -> NOT escalating, storing as knowledge")
             # Base model knows! Add to KC
             import time
             import uuid
