@@ -108,7 +108,7 @@ Respond ONLY with the JSON review object.`;
   };
 
   const model = genAI.getGenerativeModel({
-    model: "gemini-3.1-flash-lite",
+    model: process.env.REVIEW_MODEL || "gemini-3.1-flash-lite",
     systemInstruction,
     generationConfig: {
       responseMimeType: "application/json",
