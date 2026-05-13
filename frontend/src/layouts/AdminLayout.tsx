@@ -67,7 +67,7 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
         </div>
 
         <Link 
-          to="/chat"
+          to="/"
           className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#262626] border border-[#393939] text-[10px] uppercase tracking-widest font-bold text-[#c6c6c6] hover:text-[#f4f4f4] hover:bg-[#393939] transition-all group"
         >
           <ArrowLeft className="w-3 h-3 group-hover:-translate-x-1 transition-transform" />
