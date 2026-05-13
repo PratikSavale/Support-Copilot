@@ -46,7 +46,7 @@ class JiraClient:
         # Fall back to mock when credentials are missing.
         self.use_mock = not self.api_token
         self.is_configured = not self.use_mock
-        logger.info(f"[JiraClient] Initialized: use_mock={self.use_mock}, is_configured={self.is_configured}, base_url={self.base_url}, project_key={self.project_key}, email={self.email[:20] if self.email else 'NONE'}...")
+        logger.info(f"[JiraClient] Initialized: use_mock={self.use_mock}, is_configured={self.is_configured}, base_url={self.base_url}, project_key={self.project_key}")
 
     # ------------------------------------------------------------------
     # Public API
