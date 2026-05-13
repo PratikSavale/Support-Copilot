@@ -309,49 +309,110 @@ class JiraClient:
         retry=retry_if_exception_type((httpx.HTTPError, httpx.ConnectError)),
         reraise=True,
     )
+    async def get_transitions(self, issue_key: str) -> list[dict[str, Any]]:
+        """Fetch available transitions for a Jira issue."""
+        if self.use_mock:
+            return [
+                {"id": "1", "name": "To Do"},
+                {"id": "2", "name": "In Progress"},
+                {"id": "3", "name": "Done"},
+            ]
+
+        url = f"{self.base_url}/rest/api/3/issue/{issue_key}/transitions"
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.get(url, headers=self._headers())
+            response.raise_for_status()
+            data = response.json()
+            return data.get("transitions", [])
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=2, min=2, max=10),
+        retry=retry_if_exception_type((httpx.HTTPError, httpx.ConnectError)),
+        reraise=True,
+    )
+    async def perform_transition(
+        self,
+        issue_key: str,
+        transition_id: str,
+        fields: dict[str, Any] | None = None,
+    ) -> bool:
+        """Perform a transition on a Jira issue."""
+        if self.use_mock:
+            return True
+
+        url = f"{self.base_url}/rest/api/3/issue/{issue_key}/transitions"
+        payload = {"transition": {"id": transition_id}}
+        if fields:
+            payload["fields"] = fields
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(url, json=payload, headers=self._headers())
+            response.raise_for_status()
+            return True
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=2, min=2, max=10),
+        retry=retry_if_exception_type((httpx.HTTPError, httpx.ConnectError)),
+        reraise=True,
+    )
     async def update_ticket(
         self,
         issue_key: str,
         status: str | None = None,
         priority: str | None = None,
-        assignee: str | None = None,
+        assignee_id: str | None = None,
         summary: str | None = None,
     ) -> dict[str, Any]:
         """Update a Jira issue.
+
+        Note: Status updates are performed via the transitions API.
+        Assignee updates require an accountId.
 
         Args:
             issue_key: Jira issue key
             status: New status name (e.g., "In Progress", "Done")
             priority: New priority name (e.g., "High", "Medium")
-            assignee: Assignee username
+            assignee_id: Assignee Jira accountId
             summary: New summary
 
         Returns:
-            Updated issue fields
+            Updated issue fields (refetched after update)
         """
         if self.use_mock:
             return {"key": issue_key, "status": status or "Open"}
 
-        url = f"{self.base_url}/rest/api/3/issue/{issue_key}"
-        headers = self._headers()
-
-        fields: dict[str, Any] = {}
+        # 1. Handle Status Transition
         if status:
-            fields["status"] = {"name": status}
+            transitions = await self.get_transitions(issue_key)
+            transition_id = next(
+                (t["id"] for t in transitions if t["name"].lower() == status.lower()),
+                None
+            )
+            if transition_id:
+                await self.perform_transition(issue_key, transition_id)
+            else:
+                logger.warning(f"Transition '{status}' not found for issue {issue_key}")
+
+        # 2. Handle Field Updates (PUT)
+        fields: dict[str, Any] = {}
         if priority:
             fields["priority"] = {"name": priority}
-        if assignee:
-            fields["assignee"] = {"name": assignee}
+        if assignee_id:
+            fields["assignee"] = {"accountId": assignee_id}
         if summary:
             fields["summary"] = summary[:255]
 
-        payload = {"fields": fields}
+        if fields:
+            url = f"{self.base_url}/rest/api/3/issue/{issue_key}"
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.put(url, json={"fields": fields}, headers=self._headers())
+                response.raise_for_status()
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.put(url, json=payload, headers=headers)
-            response.raise_for_status()
-            data = response.json()
-            return self._extract_issue_summary(data)
+        # 3. Refetch and return current state
+        updated_data = await self.get_ticket(issue_key)
+        return updated_data or {"key": issue_key}
 
     @retry(
         stop=stop_after_attempt(3),

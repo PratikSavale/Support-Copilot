@@ -186,6 +186,17 @@ class TestUpdateTicket:
             assert result["status"] == "In Progress"
 
     @pytest.mark.asyncio
+    async def test_mock_update_ticket_with_assignee_id(self, mock_settings):
+        """Mock update_ticket should accept assignee_id."""
+        with patch("services.jira_client.get_settings", return_value=mock_settings):
+            from services.jira_client import JiraClient
+
+            client = JiraClient()
+            result = await client.update_ticket("SUP-123", assignee_id="account-id-123")
+
+            assert result["key"] == "SUP-123"
+
+    @pytest.mark.asyncio
     async def test_mock_update_ticket_partial_fields(self, mock_settings):
         """Mock update_ticket should handle partial field updates."""
         with patch("services.jira_client.get_settings", return_value=mock_settings):
@@ -195,6 +206,39 @@ class TestUpdateTicket:
             result = await client.update_ticket("SUP-123", summary="New summary")
 
             assert result["key"] == "SUP-123"
+
+
+# ------------------------------------------------------------------
+# Mock Transitions Tests
+# ------------------------------------------------------------------
+
+
+class TestTransitions:
+    """Tests for transition methods in mock mode."""
+
+    @pytest.mark.asyncio
+    async def test_mock_get_transitions(self, mock_settings):
+        """Mock get_transitions should return default transitions."""
+        with patch("services.jira_client.get_settings", return_value=mock_settings):
+            from services.jira_client import JiraClient
+
+            client = JiraClient()
+            result = await client.get_transitions("SUP-123")
+
+            assert isinstance(result, list)
+            assert len(result) == 3
+            assert result[0]["name"] == "To Do"
+
+    @pytest.mark.asyncio
+    async def test_mock_perform_transition(self, mock_settings):
+        """Mock perform_transition should return True."""
+        with patch("services.jira_client.get_settings", return_value=mock_settings):
+            from services.jira_client import JiraClient
+
+            client = JiraClient()
+            result = await client.perform_transition("SUP-123", "1")
+
+            assert result is True
 
 
 # ------------------------------------------------------------------
