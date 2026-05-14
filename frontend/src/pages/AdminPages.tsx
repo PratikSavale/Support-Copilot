@@ -78,7 +78,7 @@ export const AdminDashboard = () => {
       bgColor: 'bg-purple-500/20',
     },
     {
-      title: 'Total Tickets',
+      title: 'Total Chats',
       value: metrics.total_tickets.toLocaleString(),
       icon: Activity,
       color: 'text-amber-400',
@@ -101,7 +101,7 @@ export const AdminDashboard = () => {
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {stats.map((stat, index) => (
+        {stats.map((stat) => (
           <StatCard key={stat.title} {...stat} />
         ))}
       </div>
@@ -244,12 +244,12 @@ const SourceList = () => {
       </div>
       
       <div className="space-y-3">
-        {knowledgeSources.map((source, index) => (
+        {knowledgeSources.map((source) => (
           <motion.div 
             layout
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            key={`${source.id}-${index}`} 
+            key={source.id} 
             className="p-5 rounded-2xl bg-[#262626] border border-[#393939] flex items-center justify-between group hover:bg-[#393939] transition-all"
           >
             <div className="flex items-center gap-4 flex-1 min-w-0">
@@ -359,7 +359,7 @@ const TicketFilters = () => {
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8d8d8d] group-focus-within:text-[#0f62fe] transition-colors" />
         <input 
           type="text"
-          placeholder="Search tickets by summary or ID..."
+          placeholder="Search chats by summary or ID..."
           className="w-full bg-[#161616] border border-[#393939] rounded-xl py-2 pl-12 pr-4 text-xs text-[#f4f4f4] focus:outline-none focus:border-[#0f62fe] focus:bg-[#262626] transition-all"
         />
       </div>
@@ -388,7 +388,7 @@ const TicketTable = () => {
           <Inbox className="w-6 h-6 text-[#8d8d8d]" />
         </div>
         <div className="space-y-1">
-          <h3 className="text-[#f4f4f4] font-medium">No Tickets Found</h3>
+          <h3 className="text-[#f4f4f4] font-medium">No Chats Found</h3>
           <p className="text-[#c6c6c6] text-sm max-w-xs">No support requests match your current filters.</p>
         </div>
       </div>
@@ -408,9 +408,9 @@ const TicketTable = () => {
           </tr>
         </thead>
         <tbody className="divide-y divide-[#393939]">
-          {tickets.map((ticket, index) => (
+          {tickets.map((ticket) => (
             <motion.tr 
-              key={`${ticket.id}-${index}`}
+              key={ticket.id}
               onClick={() => openTicketDetail(ticket)}
               className="hover:bg-[#393939] cursor-pointer transition-colors group"
             >
@@ -461,7 +461,7 @@ export const TicketsPage = () => {
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-1">
-        <h2 className="text-3xl font-bold tracking-tight text-[#f4f4f4]">Ticket Oversight</h2>
+        <h2 className="text-3xl font-bold tracking-tight text-[#f4f4f4]">Chat Oversight</h2>
         <p className="text-sm text-[#c6c6c6] font-medium">Review, track, and manage escalated support requests.</p>
       </div>
 
