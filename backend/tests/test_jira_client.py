@@ -25,6 +25,7 @@ def mock_settings():
     settings.JIRA_EMAIL = "test@example.com"
     settings.JIRA_API_TOKEN = ""  # Empty = mock mode
     settings.JIRA_PROJECT_KEY = "SUP"
+    settings.JIRA_DEFAULT_ISSUE_TYPE = "Bug"
     return settings
 
 

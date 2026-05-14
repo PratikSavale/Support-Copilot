@@ -43,6 +43,7 @@ class JiraClient:
         self.email = settings.JIRA_EMAIL
         self.api_token = settings.JIRA_API_TOKEN
         self.project_key = settings.JIRA_PROJECT_KEY
+        self.default_issue_type = settings.JIRA_DEFAULT_ISSUE_TYPE
         # Fall back to mock when credentials are missing.
         self.use_mock = not self.api_token
         self.is_configured = not self.use_mock
@@ -87,12 +88,13 @@ class JiraClient:
         reraise=True,
     )
     async def create_ticket(
-        self, ticket: Any, issue_type: str = "Bug"
+        self, ticket: Any, issue_type: str | None = None
     ) -> dict[str, Any]:
         """Create a Jira issue from a Ticket ORM instance.
 
         Returns dict with at least ``key`` and ``id`` fields.
         """
+        issue_type = issue_type or self.default_issue_type
         logger.info(f"[JiraClient.create_ticket] use_mock={self.use_mock}, issue_type={issue_type}, summary={getattr(ticket, 'summary', 'N/A')[:50]}")
         if self.use_mock:
             logger.info("[JiraClient.create_ticket] Using MOCK mode - returning fake key")
@@ -189,13 +191,17 @@ class JiraClient:
                             "content": [
                                 {
                                     "type": "text",
-                                    "text": getattr(ticket, "description", "No description provided"),
+                                    "text": str(getattr(ticket, "description", None) or "No description provided"),
                                 }
                             ],
                         }
                     ],
                 },
-                "issuetype": {"name": issue_type},
+                "issuetype": (
+                    {"id": issue_type}
+                    if issue_type and issue_type.isdigit()
+                    else {"name": issue_type}
+                ),
                 "priority": self._map_severity_to_priority(
                     getattr(ticket, "severity", None)
                 ),
@@ -203,8 +209,15 @@ class JiraClient:
             }
         }
 
+        logger.debug(f"[JiraClient.create_ticket] Payload: {payload}")
+
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(url, json=payload, headers=headers)
+            if response.status_code >= 400:
+                logger.error(
+                    f"[JiraClient.create_ticket] Failed: {response.status_code} - {response.text} "
+                    f"| Project: {self.project_key} | IssueType: {issue_type}"
+                )
             response.raise_for_status()
             data = response.json()
             return {
