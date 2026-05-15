@@ -1,7 +1,5 @@
-import { X, ExternalLink, Calendar, Tag, ShieldAlert, RefreshCw, Send, User } from 'lucide-react'
+import { X, ExternalLink, Calendar, Tag, ShieldAlert } from 'lucide-react'
 import { motion } from 'framer-motion'
-import { useState } from 'react'
-import { useAdminStore } from '../store/adminStore'
 import type { Ticket } from '../store/adminStore'
 
 interface TicketDetailProps {
@@ -54,7 +52,7 @@ export const TicketDetail = ({ ticket, onClose }: TicketDetailProps) => {
               <ShieldAlert className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-[#f4f4f4]">Ticket Details</h3>
+              <h3 className="text-xl font-bold text-[#f4f4f4]">Chat Details</h3>
               <p className="text-[10px] text-[#c6c6c6] uppercase tracking-widest font-bold">Ref: {ticket.jira_issue_key || ticket.id.slice(0, 8)}</p>
             </div>
           </div>
