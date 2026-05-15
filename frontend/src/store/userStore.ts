@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { AxiosError } from 'axios'
 import { api } from '../config/api'
 
 export interface SourceInfo {
@@ -50,8 +51,6 @@ interface UserState {
   toggleSourceSelection: (sourceId: string) => void
 }
 
-
-
 export const useUserStore = create<UserState>((set) => ({
   sessionId: null,
   sessions: [],
@@ -97,7 +96,7 @@ export const useUserStore = create<UserState>((set) => ({
       const response = await api.get('/chat/sessions')
       const sessions = response.data.sessions || response.data
       set({ sessions })
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Failed to load sessions', err)
     }
   },
@@ -116,8 +115,9 @@ export const useUserStore = create<UserState>((set) => ({
         }
         return { messages: serverMessages, isHistoryLoading: false }
       })
-    } catch (err: any) {
-      if (err.response?.status === 404) {
+    } catch (err: unknown) {
+      const axiosError = err as AxiosError
+      if (axiosError.response?.status === 404) {
         // New session, no history yet - this is fine
         set({ messages: [], isHistoryLoading: false })
       } else {
@@ -132,7 +132,7 @@ export const useUserStore = create<UserState>((set) => ({
       const response = await api.get('/knowledge/sources')
       const sources = response.data.sources || response.data
       set({ availableSources: sources })
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Failed to load knowledge sources', err)
     }
   },
