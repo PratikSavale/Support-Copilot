@@ -130,17 +130,35 @@ class RAGEngine:
         embeddings = await self.embedding_engine.embed_documents(clean_chunks)
         ids = [f"{source_id}_chunk_{hashlib.md5(c.encode()).hexdigest()[:12]}" for c in clean_chunks]
 
-        # Upsert so re-indexing the same source doesn't fail on duplicate IDs.
-        for i in range(0, len(clean_chunks), self.batch_size):
+        # Deduplicate within this batch to prevent ChromaDB DuplicateIDError.
+        # Although we use .upsert, ChromaDB prohibits duplicate IDs within a single list.
+        seen_ids = set()
+        final_chunks = []
+        final_metadatas = []
+        final_embeddings = []
+        final_ids = []
+        
+        for i in range(len(ids)):
+            cid = ids[i]
+            if cid not in seen_ids:
+                seen_ids.add(cid)
+                final_chunks.append(clean_chunks[i])
+                final_metadatas.append(clean_metadatas[i])
+                final_embeddings.append(embeddings[i])
+                final_ids.append(cid)
+
+        # Upsert in batches.
+        for i in range(0, len(final_ids), self.batch_size):
             end = i + self.batch_size
             self.collection.upsert(
-                documents=clean_chunks[i:end],
-                embeddings=embeddings[i:end],
-                metadatas=clean_metadatas[i:end],
-                ids=ids[i:end],
+                documents=final_chunks[i:end],
+                embeddings=final_embeddings[i:end],
+                metadatas=final_metadatas[i:end],
+                ids=final_ids[i:end],
             )
-        logger.info("Indexed %d clean chunks for source '%s'", len(clean_chunks), source_title)
-        return len(clean_chunks)
+        logger.info("Indexed %d unique chunks (dropped %d duplicates) for source '%s'", 
+                    len(final_ids), len(ids) - len(final_ids), source_title)
+        return len(final_ids)
 
     # ------------------------------------------------------------------
     # Retrieval

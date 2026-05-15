@@ -79,8 +79,8 @@ def _make_rag_test_instance():
 async def test_add_documents_batching():
     rag = _make_rag_test_instance()
     rag.batch_size = 2 # Small batch size to test batching logic
-    # Use longer chunks to pass the 50-char filter
-    chunks = ["This is a long enough chunk to pass the minimum length filter of fifty characters." for i in range(5)]
+    # Use longer UNIQUE chunks to pass the 50-char filter and avoid deduplication
+    chunks = [f"Unique chunk {i}: This is a long enough chunk to pass the minimum length filter of fifty characters." for i in range(5)]
     
     added = await rag.add_documents("sid", "title", chunks, source_url="http://url")
     
@@ -182,6 +182,19 @@ async def test_agentic_rag_insufficient():
     
     content, sources = await rag.generate_response("query", [])
     assert content == "INSUFFICIENT_DOCUMENTATION"
+
+@pytest.mark.asyncio
+async def test_add_documents_duplicate_handling():
+    rag = _make_rag_test_instance()
+    # Identical chunks should result in identical IDs and be deduplicated
+    chunk_text = "This is a long enough chunk to pass the minimum length filter of fifty characters."
+    chunks = [chunk_text, chunk_text, "Another unique chunk that also passes the fifty character length filter."]
+    
+    added = await rag.add_documents("sid", "title", chunks)
+    
+    assert added == 2 # 1 unique + 1 unique
+    assert len(rag.collection.upsert_calls) == 1
+    assert len(rag.collection.upsert_calls[0]["ids"]) == 2
 
 @pytest.mark.asyncio
 async def test_process_query_empty():
