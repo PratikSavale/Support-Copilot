@@ -392,54 +392,25 @@ class ChatService:
         )
         logger.info(f"[DEBUG] Post-retrieval confidence: score={post.get('score')}, action={post.get('action')}, retrieval={post.get('retrieval_score')}, relevance={post.get('relevance_score')}, completeness={post.get('completeness_score')}")
 
-        # 8. Attempt RAG if resolve
-        if post["action"] == "resolve":
-            logger.info(f"[DEBUG] Post-retrieval action=resolve, attempting RAG response generation")
-            full_response, sources = await self.rag_engine.generate_response(user_message, search_results)
-            logger.info(f"[DEBUG] RAG response (first 200 chars): {full_response[:200]}")
-            
-            if "SUFFICIENT" not in hop_response.upper() and len(hop_response) > 3:
-                logger.info(f"Multi-hop active. Fetching missing info for query: {hop_response}")
-                extra_results = await self.rag_engine.search(hop_response, filters=filters)
-                
-                # Merge and deduplicate
-                seen_ids = {d["id"] for d in search_results}
-                for d in extra_results:
-                    if d["id"] not in seen_ids:
-                        search_results.append(d)
-                        seen_ids.add(d["id"])
-                        
-                # Re-sort by similarity and limit to top 8
-                search_results.sort(key=lambda x: x["similarity"], reverse=True)
-                search_results = search_results[:8]
-
-        # We always try to generate a response, even with an empty search list, because the prompt allows general knowledge.
-        post = {"action": "resolve", "score": 0.8}
-        if search_results:
-            post = await self.confidence_service.calculate_post_retrieval_confidence(
-                query=user_message,
-                retrieved_docs=search_results,
-            )
-
-        # 8. Attempt Generation (RAG or General Knowledge)
+        # 8. Attempt Generation
         full_response, sources = await self.rag_engine.generate_response(user_message, search_results)
         
-        if "I_DONT_KNOW" not in full_response:
+        if full_response != "INSUFFICIENT_DOCUMENTATION":
             yield {"type": "chunk", "content": full_response}
-                msg = await self._add_message(
-                    db, session_id, "assistant", full_response,
-                    confidence_score=post["score"],
-                    sources=sources
-                )
-                yield {
-                    "type": "final",
-                    "action": Action.resolve,
-                    "sources": [SourceInfo(**s) for s in sources],
-                    "message_id": str(msg.id)
-                }
-                return
+            msg = await self._add_message(
+                db, session_id, "assistant", full_response,
+                confidence_score=post["score"],
+                sources=sources
+            )
+            yield {
+                "type": "final",
+                "action": Action.resolve,
+                "sources": [SourceInfo(**s) for s in sources],
+                "message_id": str(msg.id)
+            }
+            return
 
-        # 9. Fallback: Either post["action"] != "resolve" OR INSUFFICIENT_DOCUMENTATION
+        # 9. Fallback: INSUFFICIENT_DOCUMENTATION
         logger.info(f"[DEBUG] Fallback path triggered, calling LLM for general knowledge")
         fallback_prompt = (
             "Answer the following technical support or programming question based on your general knowledge. "

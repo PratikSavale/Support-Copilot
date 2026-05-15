@@ -165,7 +165,7 @@ class ConfidenceService:
             return 0.5
 
     def _score_to_action(self, score: float) -> str:
-        if score < self.LOW_THRESHOLD:
+        if score <= self.LOW_THRESHOLD:
             return "clarification"
         if score < self.HIGH_THRESHOLD:
             return "searching"
