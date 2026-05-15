@@ -9,6 +9,15 @@ export interface SourceInfo {
   url?: string
 }
 
+export interface TicketInfo {
+  id: string
+  jira_issue_key?: string
+  jira_url?: string
+  summary: string
+  severity: string
+  status: string
+}
+
 export interface Message {
   id: string
   role: 'user' | 'assistant'
@@ -17,6 +26,7 @@ export interface Message {
   action?: 'resolve' | 'clarification' | 'escalated'
   suggestions?: string[]
   sources?: SourceInfo[]
+  ticket?: TicketInfo
 }
 
 export interface Session {
@@ -105,7 +115,10 @@ export const useUserStore = create<UserState>((set) => ({
     set({ isHistoryLoading: true })
     try {
       const response = await api.get(`/chat/sessions/${id}`)
-      const serverMessages = response.data.messages || []
+      const serverMessages = (response.data.messages || []).map((msg: any) => ({
+        ...msg,
+        timestamp: msg.created_at || msg.timestamp
+      }))
       
       set((state) => {
         // Only overwrite if we don't have new local messages in flight
