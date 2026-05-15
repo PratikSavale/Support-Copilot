@@ -43,7 +43,7 @@ export const RagGraphModal = ({ isOpen, onClose, message }: RagGraphModalProps) 
           </div>
         )
       },
-      style: { background: '#ffffff', border: '2px solid #0f62fe', borderRadius: '12px' }
+      style: { background: '#ffffff', border: '2px solid #0f62fe', borderRadius: '12px', width: '256px' }
     });
 
     // 2. Vector Search
@@ -59,7 +59,7 @@ export const RagGraphModal = ({ isOpen, onClose, message }: RagGraphModalProps) 
           </div>
         )
       },
-      style: { background: '#ffffff', border: '2px solid #0043ce', borderRadius: '12px' }
+      style: { background: '#ffffff', border: '2px solid #0043ce', borderRadius: '12px', width: '192px' }
     });
     edges.push({ id: 'e-uq-vs', source: 'user_query', target: 'vector_search', animated: true, style: edgeStyle, markerEnd });
 
@@ -79,7 +79,7 @@ export const RagGraphModal = ({ isOpen, onClose, message }: RagGraphModalProps) 
             </div>
           )
         },
-        style: { background: '#ffffff', border: '2px solid #da1e28', borderRadius: '12px' }
+        style: { background: '#ffffff', border: '2px solid #da1e28', borderRadius: '12px', width: '200px' }
       });
       edges.push({ id: 'e-vs-nc', source: 'vector_search', target: 'no_chunks', style: edgeStyle, markerEnd });
     } else {
@@ -97,13 +97,13 @@ export const RagGraphModal = ({ isOpen, onClose, message }: RagGraphModalProps) 
                   <span className="font-bold text-[#161616] text-xs truncate uppercase tracking-wider">{isFallback ? "LLM Base Knowledge" : "Document Context"}</span>
                 </div>
                 <div className="text-[11px] font-medium text-[#0f62fe] truncate bg-[#e5f0ff] px-2 py-1 rounded">{source.title}</div>
-                <div className="text-[10px] text-[#525252] mt-2 whitespace-pre-wrap max-h-[150px] overflow-y-auto bg-[#f4f4f4] p-2 rounded border border-[#e0e0e0] font-mono leading-relaxed text-left" style={{ textAlign: 'left' }}>
+                <div className="text-[10px] text-[#525252] mt-2 whitespace-pre-wrap break-all overflow-x-hidden w-full max-h-[150px] overflow-y-auto bg-[#f4f4f4] p-2 rounded border border-[#e0e0e0] font-mono leading-relaxed text-left" style={{ textAlign: 'left', wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
                   {source.chunk_excerpt}
                 </div>
               </div>
             )
           },
-          style: { background: '#ffffff', border: `2px solid ${isFallback ? '#8a3ffc' : '#24a148'}`, borderRadius: '12px', padding: 0 }
+          style: { background: '#ffffff', border: `2px solid ${isFallback ? '#8a3ffc' : '#24a148'}`, borderRadius: '12px', padding: 0, width: '280px' }
         });
         edges.push({ id: `e-vs-${nId}`, source: 'vector_search', target: nId, animated: true, style: { stroke: isFallback ? '#8a3ffc' : '#24a148', strokeWidth: 2 }, markerEnd: { type: MarkerType.ArrowClosed, color: isFallback ? '#8a3ffc' : '#24a148' } });
         
@@ -125,7 +125,7 @@ export const RagGraphModal = ({ isOpen, onClose, message }: RagGraphModalProps) 
           </div>
         )
       },
-      style: { background: '#ffffff', border: '2px solid #8a3ffc', borderRadius: '12px' }
+      style: { background: '#ffffff', border: '2px solid #8a3ffc', borderRadius: '12px', width: '192px' }
     });
 
     if (sources.length === 0) {
@@ -144,7 +144,7 @@ export const RagGraphModal = ({ isOpen, onClose, message }: RagGraphModalProps) 
           </div>
         )
       },
-      style: { background: '#ffffff', border: '2px solid #161616', borderRadius: '12px' }
+      style: { background: '#ffffff', border: '2px solid #161616', borderRadius: '12px', width: '256px' }
     });
     edges.push({ id: 'e-llm-fa', source: 'llm', target: 'final_answer', animated: true, style: edgeStyle, markerEnd });
 

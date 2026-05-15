@@ -18,7 +18,11 @@ from typing import Any, AsyncIterator
 from ai.chroma_utils import get_chroma_client, get_collection
 from ai.embedding_engine import get_embedding_engine
 from ai.llm_engine import get_llm_engine
-from ai.prompts import CHAT_SYSTEM_PROMPT
+from ai.prompts import (
+    CHAT_SYSTEM_PROMPT,
+    AGENTIC_RAG_PROMPT,
+    AGENTIC_RAG_SCHEMA
+)
 from ai.utils import truncate_excerpt
 from config.settings import get_settings
 
@@ -61,6 +65,7 @@ class RAGEngine:
         self.llm_engine = get_llm_engine()
         client = get_chroma_client()
         self.collection = get_collection(client, settings.CHROMA_COLLECTION)
+        self.batch_size = settings.CHROMA_BATCH_SIZE
 
     # ------------------------------------------------------------------
     # Indexing
@@ -112,12 +117,14 @@ class RAGEngine:
         ids = [f"{source_id}_chunk_{hashlib.md5(c.encode()).hexdigest()[:12]}" for c in clean_chunks]
 
         # Upsert so re-indexing the same source doesn't fail on duplicate IDs.
-        self.collection.upsert(
-            documents=clean_chunks,
-            embeddings=embeddings,
-            metadatas=clean_metadatas,
-            ids=ids,
-        )
+        for i in range(0, len(clean_chunks), self.batch_size):
+            end = i + self.batch_size
+            self.collection.upsert(
+                documents=clean_chunks[i:end],
+                embeddings=embeddings[i:end],
+                metadatas=clean_metadatas[i:end,
+                ids=ids[i:end],
+            )
         logger.info("Indexed %d clean chunks for source '%s'", len(clean_chunks), source_title)
         return len(clean_chunks)
 
@@ -342,6 +349,7 @@ class RAGEngine:
             }
         avg_similarity = sum(d["similarity"] for d in context_docs) / len(context_docs)
         response, sources = await self.generate_response(query, context_docs)
+        
         return {
             "response": response,
             "sources": sources,

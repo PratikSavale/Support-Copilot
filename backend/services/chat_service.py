@@ -370,6 +370,33 @@ class ChatService:
             )
             hop_response = await self.rag_engine.llm_engine.generate_response([{"role": "user", "content": check_prompt}])
             hop_response = hop_response.strip(' \n\'"')
+        logger.debug(f"RAG search for query: '{user_message[:100]}' ")
+        search_results = await self.rag_engine.search(user_message, filters=filters)
+        logger.info(f"[DEBUG] RAG returned {len(search_results) if search_results else 0} results")
+        if not search_results:
+            logger.info(f"[DEBUG] No RAG results -> ESCALATING to ticket")
+            resp = await self._escalate(db, session_id, user_message, history, "medium")
+            yield {"type": "chunk", "content": resp.response, "is_final": True}
+            yield {
+                "type": "final",
+                "action": Action.escalated,
+                "ticket": resp.ticket,
+                "message_id": resp.message_id
+            }
+            return
+
+        # 7. Post-retrieval confidence
+        post = await self.confidence_service.calculate_post_retrieval_confidence(
+            query=user_message,
+            retrieved_docs=search_results,
+        )
+        logger.info(f"[DEBUG] Post-retrieval confidence: score={post.get('score')}, action={post.get('action')}, retrieval={post.get('retrieval_score')}, relevance={post.get('relevance_score')}, completeness={post.get('completeness_score')}")
+
+        # 8. Attempt RAG if resolve
+        if post["action"] == "resolve":
+            logger.info(f"[DEBUG] Post-retrieval action=resolve, attempting RAG response generation")
+            full_response, sources = await self.rag_engine.generate_response(user_message, search_results)
+            logger.info(f"[DEBUG] RAG response (first 200 chars): {full_response[:200]}")
             
             if "SUFFICIENT" not in hop_response.upper() and len(hop_response) > 3:
                 logger.info(f"Multi-hop active. Fetching missing info for query: {hop_response}")
@@ -399,6 +426,48 @@ class ChatService:
         
         if "I_DONT_KNOW" not in full_response:
             yield {"type": "chunk", "content": full_response}
+                msg = await self._add_message(
+                    db, session_id, "assistant", full_response,
+                    confidence_score=post["score"],
+                    sources=sources
+                )
+                yield {
+                    "type": "final",
+                    "action": Action.resolve,
+                    "sources": [SourceInfo(**s) for s in sources],
+                    "message_id": str(msg.id)
+                }
+                return
+
+        # 9. Fallback: Either post["action"] != "resolve" OR INSUFFICIENT_DOCUMENTATION
+        logger.info(f"[DEBUG] Fallback path triggered, calling LLM for general knowledge")
+        fallback_prompt = (
+            "Answer the following technical support or programming question based on your general knowledge. "
+            "If you do not know the answer or are not highly confident, you MUST reply EXACTLY with 'I_DONT_KNOW'.\n\n"
+            f"Question: {user_message}"
+        )
+        fallback_response = await self.rag_engine.llm_engine.generate_response([{"role": "user", "content": fallback_prompt}])
+        logger.info(f"[DEBUG] Fallback LLM response (first 200 chars): {fallback_response[:200]}")
+        
+        if "I_DONT_KNOW" in fallback_response or "Mocked Response" in fallback_response:
+            logger.info(f"[DEBUG] Fallback LLM said I_DONT_KNOW -> ESCALATING to ticket")
+            # Base LLM also doesn't know -> Escalate to ticket
+            resp = await self._escalate(db, session_id, user_message, history, "high")
+            yield {"type": "chunk", "content": resp.response, "is_final": True}
+            yield {
+                "type": "final",
+                "action": Action.escalated,
+                "ticket": resp.ticket,
+                "message_id": resp.message_id
+            }
+            return
+        else:
+            logger.info(f"[DEBUG] Fallback LLM returned answer -> NOT escalating, storing as knowledge")
+            # Base model knows! Add to KC
+            import time
+            import uuid
+            new_source_id = f"fallback_{int(time.time())}"
+            await self.rag_engine.add_documents(new_source_id, f"Auto-generated answer for: {user_message}", [fallback_response])
             
             # If sources are empty, it means we used general knowledge
             if not sources and "general knowledge" in full_response.lower():

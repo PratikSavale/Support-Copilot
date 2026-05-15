@@ -4,19 +4,27 @@ Web scraper utility for knowledge ingestion.
 Fetches web pages and extracts clean text using httpx + BeautifulSoup.
 """
 
-from __future__ import annotations
-
+import asyncio
+import logging
 import re
+from collections import deque
+from urllib.parse import urldefrag, urljoin, urlparse
 
 import httpx
 from bs4 import BeautifulSoup
+
+logger = logging.getLogger(__name__)
 
 
 class WebScraper:
     """Fetches and cleans web content for knowledge ingestion."""
 
-    def __init__(self, timeout: float = 30.0) -> None:
+    def __init__(self, timeout: float = 30.0, polite_delay: float = 0.3) -> None:
         self.timeout = timeout
+        self.polite_delay = polite_delay
+        self.headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        }
 
     async def fetch_content(self, url: str) -> str:
         """Fetch a URL and return cleaned text content using Jina AI Reader.
@@ -30,11 +38,10 @@ class WebScraper:
         Raises:
             httpx.HTTPStatusError: On non-2xx responses.
         """
-        headers = {
-            "User-Agent": "Mozilla/5.0 (compatible; CopilotBot/1.0)",
-        }
         async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
-            response = await client.get(f"https://r.jina.ai/{url}", headers=headers)
+            response = await client.get(f"https://r.jina.ai/{url}", headers=self.headers)
+            if response.status_code != 200:
+                logger.warning("Fetch failed for %s: Status %s", url, response.status_code)
             response.raise_for_status()
             return response.text
 
@@ -45,10 +52,6 @@ class WebScraper:
     async def crawl_website(self, start_url: str, max_pages: int = 200, max_concurrent: int = 20) -> list[str]:
         """Crawl a website recursively, restricted to the start_url path.
 
-        Uses a single shared HTTP client for connection reuse and adds
-        polite delays between requests to avoid being rate-limited or
-        blocked by the target server.
-
         Args:
             start_url: Root URL to start crawling from.
             max_pages: Maximum number of pages to fetch.
@@ -57,13 +60,15 @@ class WebScraper:
         Returns:
             List of dicts with {"url": str, "content": str}.
         """
-        import asyncio
-        import logging
-        from urllib.parse import urlparse, urljoin, urldefrag
-
-        logger = logging.getLogger(__name__)
-
         parsed_start = urlparse(start_url)
+        path = parsed_start.path
+        if not path.endswith("/"):
+            if "." in path.split("/")[-1]:
+                path = "/".join(path.split("/")[:-1]) + "/"
+            else:
+                path += "/"
+        
+        scope_prefix = f"{parsed_start.scheme}://{parsed_start.netloc}{path}"
         base_domain = f"{parsed_start.scheme}://{parsed_start.netloc}"
         
         # Determine the base path prefix to restrict crawling to the specific documentation/subsite.
@@ -74,26 +79,18 @@ class WebScraper:
         base_prefix = f"{base_domain}{base_path}"
 
         visited: set[str] = {start_url}
-        queue: list[str] = [start_url]
+        queue: deque[str] = deque([start_url])
         results: list[str] = []
-        headers = {"User-Agent": "Mozilla/5.0 (compatible; CopilotBot/1.0)"}
         semaphore = asyncio.Semaphore(max_concurrent)
 
         async def fetch_one(client: httpx.AsyncClient, url: str) -> tuple[str, str, list[str]]:
             """Fetch a single page and extract its text + discovered links."""
             async with semaphore:
                 try:
-                    # 1. Fetch raw HTML (Fast, good for legacy framesets like Java Docs)
-                    raw_resp = await client.get(url, headers=headers)
-                    html = raw_resp.text
-                    
-                    # 2. Fetch Jina AI Markdown (Executes JS, good for React SPAs)
-                    jina_resp = await client.get(f"https://r.jina.ai/{url}", headers=headers)
+                    # Fetch via Jina AI Reader (handles JS/SPAs and returns clean Markdown)
+                    jina_resp = await client.get(f"https://r.jina.ai/{url}", headers=self.headers)
+                    jina_resp.raise_for_status()
                     text = jina_resp.text
-                    
-                except httpx.HTTPStatusError as exc:
-                    logger.warning("HTTP %s for %s", exc.response.status_code, url)
-                    return "", []
                 except Exception as exc:
                     logger.warning("Failed to fetch %s: %s", url, exc)
                     return "", []
@@ -121,6 +118,9 @@ class WebScraper:
                         abs_url = abs_url.split('?')[0]
                     if abs_url.startswith(base_prefix):
                         new_urls.append(abs_url)
+                    elif abs_url.startswith(base_domain):
+                        # Optional: could add some logic here if we want to follow domain but not path
+                        pass
 
                 # --- Storybook SPA Heuristic ---
                 # Storybook loads its actual content inside an iframe.
@@ -130,7 +130,7 @@ class WebScraper:
                         story_id = storybook_match.group(1).replace('--docs', '').replace('&viewMode=docs', '')
                         iframe_url = urljoin(url, f"/iframe.html?id={story_id}&viewMode=docs")
                         logger.info("Detected Storybook URL. Fetching iframe content: %s", iframe_url)
-                        iframe_resp = await client.get(f"https://r.jina.ai/{iframe_url}", headers=headers)
+                        iframe_resp = await client.get(f"https://r.jina.ai/{iframe_url}", headers=self.headers)
                         if iframe_resp.status_code == 200 and iframe_resp.text:
                             text += "\n\n" + iframe_resp.text
                     except Exception as e:
@@ -141,15 +141,16 @@ class WebScraper:
 
                 return url, text, new_urls
 
-        logger.info("Starting crawl of %s (max_pages=%d)", start_url, max_pages)
+        logger.info("Starting crawl of %s (scope_prefix=%s, max_pages=%d)", start_url, scope_prefix, max_pages)
 
         async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
             while queue and len(results) < max_pages:
-                # Take a batch from the queue.
-                batch = queue[:max_concurrent]
-                queue = queue[max_concurrent:]
+                # Process in batches of max_concurrent
+                current_batch = []
+                while queue and len(current_batch) < max_concurrent:
+                    current_batch.append(queue.popleft())
 
-                tasks = [fetch_one(client, u) for u in batch]
+                tasks = [fetch_one(client, u) for u in current_batch]
                 batch_results = await asyncio.gather(*tasks)
 
                 for url, text, new_urls in batch_results:
@@ -160,15 +161,11 @@ class WebScraper:
                             visited.add(u)
                             queue.append(u)
 
-                if len(results) % 20 == 0 and results:
+                if len(results) > 0 and len(results) % 20 == 0:
                     logger.info("Crawl progress: %d pages collected, %d in queue", len(results), len(queue))
 
         logger.info("Crawl finished: %d pages collected from %s", len(results), start_url)
         return results
-
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
 
     @staticmethod
     def _is_quality_page(text: str) -> bool:
@@ -211,7 +208,7 @@ class WebScraper:
 
     @staticmethod
     def _parse_html(html: str) -> str:
-        """Strip boilerplate elements and return plain text."""
+        """Strip boilerplate elements and return plain text (fallback if Jina not used)."""
         soup = BeautifulSoup(html, "html.parser")
 
         # Remove non-content elements.
@@ -219,25 +216,17 @@ class WebScraper:
             tag.decompose()
 
         text = soup.get_text(separator="\n")
-
-        # Collapse excessive whitespace while preserving paragraph breaks.
         lines = (line.strip() for line in text.splitlines())
         text = "\n".join(line for line in lines if line)
-
-        # Collapse runs of 3+ newlines into 2.
         text = re.sub(r"\n{3,}", "\n\n", text)
         return text.strip()
 
     # ------------------------------------------------------------------
-    # Stub methods for non-HTML content (future work)
+    # Future work
     # ------------------------------------------------------------------
 
     async def fetch_pdf(self, url: str) -> str:
-        """Fetch and extract text from a PDF (placeholder)."""
-        # TODO: Implement with PyPDF2 or pdfplumber if needed.
         raise NotImplementedError("PDF ingestion not yet implemented")
 
     async def fetch_docx(self, url: str) -> str:
-        """Fetch and extract text from a DOCX file (placeholder)."""
-        # TODO: Implement with python-docx if needed.
         raise NotImplementedError("DOCX ingestion not yet implemented")
