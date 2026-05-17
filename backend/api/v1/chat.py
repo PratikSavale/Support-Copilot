@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
 
-from api.dependencies import DbSession, CurrentUser
+from api.dependencies import CurrentUser, DbSession
 from schemas.chat import (
+    AttachmentParseResponse,
     ChatRequest,
     ChatResponse,
     MessageResponse,
@@ -17,8 +18,43 @@ from schemas.chat import (
     SessionResponse,
 )
 from services.service_factory import get_chat_service
+from utils.attachment_parser import AttachmentKind, AttachmentParser
 
 router = APIRouter()
+
+
+@router.post(
+    "/attachments/parse",
+    response_model=AttachmentParseResponse,
+)
+async def parse_attachment(
+    current_user: CurrentUser,
+    file: UploadFile = File(...),
+    attachment_type: AttachmentKind = Query("auto"),
+) -> AttachmentParseResponse:
+    """Parse a user-provided issue attachment into a searchable issue summary."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+
+    data = await file.read()
+    if not data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded file is empty",
+        )
+
+    parser = AttachmentParser()
+    try:
+        result = await parser.parse(
+            file_name=file.filename or "attachment",
+            mime_type=file.content_type or "application/octet-stream",
+            data=data,
+            attachment_type=attachment_type,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    return AttachmentParseResponse(**result.to_dict())
 
 
 @router.post(

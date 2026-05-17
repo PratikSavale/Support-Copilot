@@ -50,6 +50,20 @@ class ChatRequest(BaseModel):
     follow_up_responses: list[str] | None = None
 
 
+class AttachmentParseResponse(BaseModel):
+    attachment_type: str
+    file_name: str
+    mime_type: str
+    issue_summary: str
+    extracted_text: str = ""
+    detected_error: str | None = None
+    screen_or_area: str | None = None
+    visible_steps: list[str] = Field(default_factory=list)
+    important_evidence: list[str] = Field(default_factory=list)
+    confidence: float
+    warnings: list[str] = Field(default_factory=list)
+
+
 class ChatResponse(BaseModel):
     session_id: str
     message_id: str
