@@ -16,6 +16,7 @@ from schemas.chat import (
     SessionDetailResponse,
     SessionListResponse,
     SessionResponse,
+    ChatFeedbackRequest,
 )
 from services.service_factory import get_chat_service
 from utils.attachment_parser import AttachmentKind, AttachmentParser
@@ -173,3 +174,29 @@ async def get_session(session_id: UUID, db: DbSession, current_user: CurrentUser
         updated_at=session.updated_at,
         messages=messages_response,
     )
+
+
+@router.post(
+    "/sessions/{session_id}/messages/{message_id}/feedback",
+    status_code=status.HTTP_200_OK,
+)
+async def submit_feedback(
+    session_id: UUID,
+    message_id: UUID,
+    feedback: ChatFeedbackRequest,
+    db: DbSession,
+    current_user: CurrentUser,
+):
+    """Submit user feedback (thumbs up/down) for a specific assistant message."""
+    chat_service = get_chat_service()
+    session = await chat_service.get_session(db, str(session_id))
+    if session and str(session.user_id) != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Not authorized to access this session")
+
+    await chat_service.submit_message_feedback(
+        db=db,
+        session_id=str(session_id),
+        message_id=str(message_id),
+        status=feedback.status,
+    )
+    return {"status": "ok"}

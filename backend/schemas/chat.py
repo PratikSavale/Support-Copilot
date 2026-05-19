@@ -135,3 +135,13 @@ class SessionDetailResponse(SessionResponse):
 
 class SessionListResponse(BaseModel):
     sessions: list[SessionResponse]
+
+
+class FeedbackStatus(str, Enum):
+    success = "success"
+    failed = "failed"
+
+
+class ChatFeedbackRequest(BaseModel):
+    status: FeedbackStatus
+

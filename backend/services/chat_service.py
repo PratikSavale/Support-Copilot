@@ -178,8 +178,8 @@ class ChatService:
             session = await self.create_session(db, user_id=user_id, title=user_message[:80], session_id=session_id)
             session_id = str(session.id)
 
-        # Store user message in DB
-        await self._add_message(db, session_id, "user", user_message)
+        # Store user message in DB with attachments saved in the sources JSONB column
+        await self._add_message(db, session_id, "user", user_message, sources=attachments)
 
         # Auto-title the session on first user message.
         if session.title == "New Conversation" and user_message:
@@ -192,6 +192,51 @@ class ChatService:
             recent_messages = []
             
         history = [m.content for m in recent_messages]
+
+        # Construct optimized semantic search query for vector guide lookup
+        search_query = user_message
+        if attachments:
+            summaries = [f"Attachment {a.get('file_name', '')} summary: {a.get('issue_summary', '')}" for a in attachments]
+            search_query += "\n\n" + "\n".join(summaries)
+
+        # ── Check Cache (Stage 1: Pure Semantic check on rich query) ──
+        from services.cache_service import get_cache_service
+        cache_svc = get_cache_service()
+        cached_val = await cache_svc.check_cache(search_query, knowledge_source_ids)
+        
+        # (Stage 2: Deterministic Regex-based check if Stage 1 misses)
+        if not cached_val:
+            from utils.log_parser import extract_diagnostic_signature
+            sig = extract_diagnostic_signature(search_query)
+            if sig:
+                logger.info("🎯 [Cache] Stage 2: Checking cache with extracted diagnostic signature: '%s'", sig)
+                cached_val = await cache_svc.check_cache(sig, knowledge_source_ids)
+
+        if cached_val:
+            response_text = cached_val["response"]
+            sources = cached_val["sources"]
+            msg = await self._add_message(
+                db, session_id, "assistant", response_text,
+                confidence_score=1.0,
+                sources=sources,
+                action=Action.resolve,
+            )
+            return ChatResponse(
+                session_id=str(session_id),
+                message_id=str(msg.id),
+                response=response_text,
+                sources=[SourceInfo(**s) for s in sources],
+                action=Action.resolve,
+                ticket=None,
+            )
+
+        # Extract failed doc URLs in this session to exclude them (DRY Search)
+        failed_urls = set()
+        for m in recent_messages:
+            if m.action == "failed" and m.sources:
+                for s in m.sources:
+                    if s.get("url"):
+                        failed_urls.add(s.get("url"))
 
         # Construct optimized semantic search query for vector guide lookup
         search_query = user_message
@@ -231,7 +276,15 @@ class ChatService:
         # ── 4. MEDIUM / HIGH → RAG search ──────────────────────────────
         filters = None
         if knowledge_source_ids:
-            filters = {"source_id": {"$in": knowledge_source_ids}}
+            if failed_urls:
+                filters = {
+                    "$and": [
+                        {"source_id": {"$in": knowledge_source_ids}},
+                        {"source_url": {"$nin": list(failed_urls)}}
+                    ]
+                }
+            else:
+                filters = {"source_id": {"$in": knowledge_source_ids}}
         search_results = await self.rag_engine.search(search_query, filters=filters)
 
         # Build high-fidelity grounded generation query containing raw unsummarized evidence
@@ -342,8 +395,53 @@ class ChatService:
             session = await self.create_session(db, user_id=user_id, title=user_message[:80], session_id=session_id)
             session_id = str(session.id)
 
-        # 2. Store user message
-        await self._add_message(db, session_id, "user", user_message)
+        # Construct optimized semantic search query for vector guide lookup
+        search_query = user_message
+        if attachments:
+            summaries = [f"Attachment {a.get('file_name', '')} summary: {a.get('issue_summary', '')}" for a in attachments]
+            search_query += "\n\n" + "\n".join(summaries)
+
+        # 2. Store user message with attachments inside sources JSONB
+        await self._add_message(db, session_id, "user", user_message, sources=attachments)
+
+        # ── Check Cache (Stage 1: Pure Semantic check on rich query) ──
+        from services.cache_service import get_cache_service
+        cache_svc = get_cache_service()
+        cached_val = await cache_svc.check_cache(search_query, knowledge_source_ids)
+        
+        # (Stage 2: Deterministic Regex-based check if Stage 1 misses)
+        if not cached_val:
+            from utils.log_parser import extract_diagnostic_signature
+            sig = extract_diagnostic_signature(search_query)
+            if sig:
+                logger.info("🎯 [Cache] Stage 2: Checking cache with extracted diagnostic signature: '%s'", sig)
+                cached_val = await cache_svc.check_cache(sig, knowledge_source_ids)
+
+        if cached_val:
+            response_text = cached_val["response"]
+            sources = cached_val["sources"]
+            
+            # Yield chunks of response_text to simulate typing
+            chunk_size = 10
+            import asyncio
+            yield {"type": "start"}
+            for i in range(0, len(response_text), chunk_size):
+                yield {"type": "chunk", "content": response_text[i:i+chunk_size]}
+                await asyncio.sleep(0.01) # fast stream
+                
+            msg = await self._add_message(
+                db, session_id, "assistant", response_text,
+                confidence_score=1.0,
+                sources=sources,
+                action=Action.resolve,
+            )
+            yield {
+                "type": "final",
+                "action": Action.resolve,
+                "sources": [SourceInfo(**s) for s in sources],
+                "message_id": str(msg.id)
+            }
+            return
 
         # Immediate yield for thinking bubble!
         yield {"type": "start"}
@@ -354,6 +452,14 @@ class ChatService:
         except Exception:
             recent_messages = []
         history = [m.content for m in recent_messages]
+
+        # Extract failed doc URLs in this session to exclude them (DRY Search)
+        failed_urls = set()
+        for m in recent_messages:
+            if m.action == "failed" and m.sources:
+                for s in m.sources:
+                    if s.get("url"):
+                        failed_urls.add(s.get("url"))
 
         # Construct optimized semantic search query for ChromaDB
         search_query = user_message
@@ -393,7 +499,15 @@ class ChatService:
 
         filters = None
         if knowledge_source_ids:
-            filters = {"source_id": {"$in": knowledge_source_ids}}
+            if failed_urls:
+                filters = {
+                    "$and": [
+                        {"source_id": {"$in": knowledge_source_ids}},
+                        {"source_url": {"$nin": list(failed_urls)}}
+                    ]
+                }
+            else:
+                filters = {"source_id": {"$in": knowledge_source_ids}}
         search_results = await self.rag_engine.search(refined_search, filters=filters)
         
         # --- Multi-hop Architecture ---
@@ -583,3 +697,74 @@ class ChatService:
                 ),
             ),
         )
+
+    async def submit_message_feedback(
+        self,
+        db: AsyncSession,
+        session_id: str,
+        message_id: str,
+        status: str,
+    ) -> None:
+        """Submit thumbs up/down feedback for an assistant message and handle caching or invalidation."""
+        msg = await db.get(Message, uuid.UUID(message_id))
+        if not msg:
+            raise ValueError(f"Message {message_id} not found")
+
+        session = await db.get(Session, uuid.UUID(session_id))
+        if not session:
+            raise ValueError(f"Session {session_id} not found")
+
+        await db.refresh(session, ["messages"])
+
+        user_query = ""
+        user_attachments = []
+        for i, m in enumerate(session.messages):
+            if str(m.id) == str(message_id):
+                # Search backwards for the user query that triggered this assistant message
+                for prev_msg in reversed(session.messages[:i]):
+                    if prev_msg.role.value == "user" or (hasattr(prev_msg.role, "value") and prev_msg.role.value == "user"):
+                        user_query = prev_msg.content
+                        user_attachments = prev_msg.sources or []
+                        break
+                break
+
+        # Reconstruct the rich search query!
+        rich_query = user_query
+        if user_attachments:
+            summaries = [f"Attachment {a.get('file_name', '')} summary: {a.get('issue_summary', '')}" for a in user_attachments]
+            rich_query += "\n\n" + "\n".join(summaries)
+
+        if status == "success":
+            logger.info("👍 [Feedback] User approved solution for query: %s", user_query[:50])
+            from services.cache_service import get_cache_service
+            cache_svc = get_cache_service()
+            
+            # Extract active source ids
+            sources = msg.sources or []
+            knowledge_source_ids = list({s.get("source_id") for s in sources if s.get("source_id")})
+            
+            # Store primary cache entry under rich query
+            await cache_svc.store_cache(
+                query=rich_query or "User Query",
+                response=msg.content,
+                sources=sources,
+                knowledge_source_ids=knowledge_source_ids
+            )
+            
+            # If an exception signature is extracted, store a secondary cache entry under signature
+            from utils.log_parser import extract_diagnostic_signature
+            sig = extract_diagnostic_signature(rich_query)
+            if sig:
+                logger.info("💾 [Cache] Storing secondary cache entry under diagnostic signature: '%s'", sig)
+                await cache_svc.store_cache(
+                    query=sig,
+                    response=msg.content,
+                    sources=sources,
+                    knowledge_source_ids=knowledge_source_ids
+                )
+        elif status == "failed":
+            logger.info("👎 [Feedback] User rejected solution for query: %s", user_query[:50])
+            # Set action to 'failed' to exclude its sources from future search history
+            msg.action = "failed"
+            db.add(msg)
+            await db.flush()

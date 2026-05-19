@@ -88,6 +88,14 @@ class KnowledgeService:
         except Exception as exc:
             logger.warning("ChromaDB cleanup failed for source %s: %s", source_id, exc)
 
+        # Clean up Semantic Cache entries for this source
+        try:
+            from services.cache_service import get_cache_service
+            cache_svc = get_cache_service()
+            cache_svc.invalidate_cache(str(source_id))
+        except Exception as exc:
+            logger.warning("Semantic Cache cleanup failed for source %s: %s", source_id, exc)
+
         await db.delete(source)
         return True
 
@@ -196,5 +204,13 @@ class KnowledgeService:
             )
         except Exception as exc:
             logger.warning("ChromaDB cleanup before reindex failed: %s", exc)
+
+        # Clean up Semantic Cache entries for this source
+        try:
+            from services.cache_service import get_cache_service
+            cache_svc = get_cache_service()
+            cache_svc.invalidate_cache(str(source_id))
+        except Exception as exc:
+            logger.warning("Semantic Cache cleanup failed for source %s: %s", source_id, exc)
 
         return await self.ingest_source(source_id)

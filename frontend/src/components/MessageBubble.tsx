@@ -1,12 +1,24 @@
+import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Bot, User, CheckCircle2, AlertCircle, HelpCircle, BrainCircuit, ExternalLink } from 'lucide-react'
+import {
+  Bot,
+  User,
+  CheckCircle2,
+  AlertCircle,
+  HelpCircle,
+  BrainCircuit,
+  ExternalLink,
+  ThumbsUp,
+  ThumbsDown,
+  Loader2
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Message } from '../store/userStore'
 import { useUserStore } from '../store/userStore'
 import { ClarificationChips } from './ClarificationChips'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useState } from 'react'
+import { api } from '@/config/api'
 
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -23,6 +35,11 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
   const { sendMessage } = useWebSocket(sessionId || null)
   const [activePanelIdx, setActivePanelIdx] = useState<number | null>(null)
   const { messages } = useUserStore()
+
+  // Feedback & Escalation states
+  const [feedback, setFeedback] = useState<'none' | 'liked' | 'disliked'>('none')
+  const [isEscating, setIsEscating] = useState(false)
+  const [escalationResult, setEscalationResult] = useState<any>(null)
 
   // Find the user query that triggered this AI answer
   const userQuery = (() => {
@@ -46,6 +63,29 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
       ? new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   })()
+
+  const handleFeedback = async (status: 'success' | 'failed') => {
+    if (!sessionId || !message.id) return
+    try {
+      await api.post(`/chat/sessions/${sessionId}/messages/${message.id}/feedback`, { status })
+      setFeedback(status === 'success' ? 'liked' : 'disliked')
+    } catch (err) {
+      console.error('Failed to submit message feedback:', err)
+    }
+  }
+
+  const handleEscalate = async () => {
+    if (!sessionId) return
+    setIsEscating(true)
+    try {
+      const response = await api.post('/tickets/escalate', { session_id: sessionId })
+      setEscalationResult(response.data)
+    } catch (err) {
+      console.error('Failed to escalate session:', err)
+    } finally {
+      setIsEscating(false)
+    }
+  }
 
   return (
     <motion.div
@@ -91,18 +131,119 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
             )}
           </div>
 
-          {/* Action Indicators */}
+          {/* Action & Feedback Indicators */}
           {isAI && message.action && (
-            <div className={cn(
-              "mt-3 pt-3 border-t border-[#e0e0e0] flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider",
-              message.action === 'resolve' && "text-[#24a148]",
-              message.action === 'clarification' && "text-[#f1c21b]",
-              message.action === 'escalated' && "text-[#da1e28]"
-            )}>
-              {message.action === 'resolve' && <CheckCircle2 className="w-3.5 h-3.5" />}
-              {message.action === 'clarification' && <HelpCircle className="w-3.5 h-3.5" />}
-              {message.action === 'escalated' && <AlertCircle className="w-3.5 h-3.5" />}
-              {message.action}
+            <div className="mt-3 pt-3 border-t border-[#e0e0e0] flex items-center justify-between">
+              <div className={cn(
+                "flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider",
+                message.action === 'resolve' && "text-[#24a148]",
+                message.action === 'clarification' && "text-[#f1c21b]",
+                message.action === 'escalated' && "text-[#da1e28]"
+              )}>
+                {message.action === 'resolve' && <CheckCircle2 className="w-3.5 h-3.5" />}
+                {message.action === 'clarification' && <HelpCircle className="w-3.5 h-3.5" />}
+                {message.action === 'escalated' && <AlertCircle className="w-3.5 h-3.5" />}
+                {message.action}
+              </div>
+
+              {/* Feedback buttons for Resolved action */}
+              {message.action === 'resolve' && feedback === 'none' && (
+                <div className="flex items-center gap-1.5 bg-[#f4f4f4] rounded-lg p-0.5 border border-[#e0e0e0] dark:bg-black/10">
+                  <button
+                    onClick={() => handleFeedback('success')}
+                    className="p-1 rounded hover:bg-[#e8f0ff] hover:text-[#0f62fe] text-[#525252] transition-colors"
+                    title="This solved my issue"
+                  >
+                    <ThumbsUp className="w-3.5 h-3.5" />
+                  </button>
+                  <div className="w-[1px] h-3 bg-[#e0e0e0]" />
+                  <button
+                    onClick={() => handleFeedback('failed')}
+                    className="p-1 rounded hover:bg-[#fff1f1] hover:text-[#da1e28] text-[#525252] transition-colors"
+                    title="This did not work"
+                  >
+                    <ThumbsDown className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+
+              {message.action === 'resolve' && feedback === 'liked' && (
+                <span className="text-[10px] text-[#24a148] font-semibold flex items-center gap-1">
+                  <ThumbsUp className="w-3 h-3 fill-current" /> Verified Solution
+                </span>
+              )}
+
+              {message.action === 'resolve' && feedback === 'disliked' && !escalationResult && (
+                <span className="text-[10px] text-[#da1e28] font-semibold flex items-center gap-1">
+                  <ThumbsDown className="w-3 h-3 fill-current" /> Did not work
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Feedback Escalation Prompt Card */}
+          {feedback === 'disliked' && !escalationResult && (
+            <div className="mt-3 pt-3 border-t border-[#e0e0e0] text-xs">
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 dark:bg-rose-950/10 dark:border-rose-900/30 flex flex-col gap-2">
+                <span className="font-semibold text-rose-700 dark:text-rose-400">Sorry that didn't help!</span>
+                <span className="text-[#525252] text-[11px]">Would you like to escalate this directly to our engineering support team on Jira?</span>
+                <button
+                  disabled={isEscating}
+                  onClick={handleEscalate}
+                  className="mt-1 self-start inline-flex items-center gap-2 bg-[#da1e28] hover:bg-[#b81b22] text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors shadow-sm disabled:bg-rose-300"
+                >
+                  {isEscating ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> Escalating...
+                    </>
+                  ) : (
+                    <>Escalate to Jira</>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Inline Escalated Ticket Card (if manually escalated just now) */}
+          {escalationResult && (
+            <div className="mt-3 pt-3 border-t border-[#e0e0e0]">
+              <div className="flex flex-col gap-2 px-3 py-2.5 rounded-md bg-[#fff1f1] border border-[#da1e28]/20 group cursor-pointer hover:bg-[#fff1f1]/80 transition-colors"
+                onClick={() => {
+                  if (escalationResult.ticket?.jira_url) {
+                    window.open(escalationResult.ticket.jira_url, '_blank', 'noopener,noreferrer')
+                  } else {
+                    navigate('/tickets')
+                  }
+                }}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-3.5 h-3.5 text-[#da1e28] flex-shrink-0" />
+                    <div>
+                      <span className="text-[11px] font-semibold text-[#161616] block">
+                        Jira Ticket Created
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-[9px] font-semibold uppercase tracking-wider text-[#da1e28] bg-[#da1e28]/10 px-2 py-0.5 rounded-full">
+                      {escalationResult.ticket?.status || 'In Review'}
+                    </span>
+                    <div className="text-[#da1e28]">
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="pl-[22px]">
+                  <p className="text-[10px] text-[#525252] mb-1.5">
+                    Your request has been escalated. Our engineering support team is on it!
+                  </p>
+                  <span className="text-[10px] font-mono font-medium text-[#161616] bg-white px-2 py-0.5 rounded border border-[#e0e0e0]">
+                    {escalationResult.ticket?.jira_issue_key || escalationResult.jira_key}
+                  </span>
+                </div>
+              </div>
             </div>
           )}
 

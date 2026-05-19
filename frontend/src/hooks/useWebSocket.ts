@@ -16,6 +16,7 @@ interface WSMessage {
   action?: 'resolve' | 'clarification' | 'escalated'
   suggestions?: string[]
   sources?: SourceInfo[]
+  message_id?: string
 }
 
 export const useWebSocket = (sessionId: string | null) => {
@@ -97,21 +98,20 @@ export const useWebSocket = (sessionId: string | null) => {
           
           case 'final':
             storeRef.current.setStreaming(false)
-            if (data.action || data.suggestions || data.sources) {
-               useUserStore.setState((state) => {
-                 const newMessages = [...state.messages]
-                 if (newMessages.length > 0) {
-                   const lastIdx = newMessages.length - 1
-                   newMessages[lastIdx] = {
-                     ...newMessages[lastIdx],
-                     action: data.action,
-                     suggestions: data.suggestions,
-                     sources: data.sources
-                   }
-                 }
-                 return { messages: newMessages }
-               })
-            }
+            useUserStore.setState((state) => {
+              const newMessages = [...state.messages]
+              if (newMessages.length > 0) {
+                const lastIdx = newMessages.length - 1
+                newMessages[lastIdx] = {
+                  ...newMessages[lastIdx],
+                  id: data.message_id || newMessages[lastIdx].id,
+                  action: data.action,
+                  suggestions: data.suggestions,
+                  sources: data.sources
+                }
+              }
+              return { messages: newMessages }
+            })
             break
           
           case 'error':
