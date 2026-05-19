@@ -62,8 +62,21 @@ class LLMEngine:
         lc = self._to_langchain_messages(messages, system_prompt)
         try:
             response = await self.model.ainvoke(lc)
-            return str(response.content)
+            content = response.content
+            
+            # Robustly handle list of content blocks from newer LangChain versions
+            if isinstance(content, list):
+                text_parts = []
+                for part in content:
+                    if isinstance(part, str):
+                        text_parts.append(part)
+                    elif isinstance(part, dict) and part.get("type") == "text":
+                        text_parts.append(part.get("text", ""))
+                return "".join(text_parts)
+            
+            return str(content)
         except Exception as e:
+            logger.error("LLMEngine Error calling Gemini API: %s", e, exc_info=True)
             return f"Mocked Response due to API Error: {str(e)[:100]}..."
 
     async def generate_response_stream(
@@ -74,8 +87,18 @@ class LLMEngine:
             async for chunk in self.model.astream(lc):
                 content = getattr(chunk, "content", None)
                 if content:
-                    yield str(content)
+                    if isinstance(content, list):
+                        text_parts = []
+                        for part in content:
+                            if isinstance(part, str):
+                                text_parts.append(part)
+                            elif isinstance(part, dict) and part.get("type") == "text":
+                                text_parts.append(part.get("text", ""))
+                        yield "".join(text_parts)
+                    else:
+                        yield str(content)
         except Exception as e:
+            logger.error("LLMEngine Error in response stream: %s", e, exc_info=True)
             yield f" Mocked Stream due to API Error: {str(e)[:50]}..."
 
     @retry(
