@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react'
-import { useUserStore, type Message, type SourceInfo } from '../store/userStore'
+import { useUserStore, type Message, type SourceInfo, type TicketInfo } from '../store/userStore'
 import { useAuthStore } from '../store/authStore'
 import { WS_BASE_URL } from '../config/api'
 
@@ -17,6 +17,7 @@ interface WSMessage {
   suggestions?: string[]
   sources?: SourceInfo[]
   message_id?: string
+  ticket?: TicketInfo
 }
 
 export const useWebSocket = (sessionId: string | null) => {
@@ -107,7 +108,8 @@ export const useWebSocket = (sessionId: string | null) => {
                   id: data.message_id || newMessages[lastIdx].id,
                   action: data.action,
                   suggestions: data.suggestions,
-                  sources: data.sources
+                  sources: data.sources,
+                  ticket: data.ticket
                 }
               }
               return { messages: newMessages }
