@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
 import {
+  Check,
   CheckCircle2,
   FileText,
-  Image,
+  Image as ImageIcon,
   Loader2,
   Paperclip,
   Send,
@@ -10,12 +11,13 @@ import {
   Square,
   Video,
   X,
+  AlertCircle
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { api } from '@/config/api'
 
 interface MessageInputProps {
-  onSendMessage: (content: string) => void
+  onSendMessage: (content: string, attachments?: ParsedAttachment[]) => void
   onStop?: () => void
   disabled?: boolean
   isStreaming?: boolean
@@ -34,12 +36,23 @@ interface AttachmentOption {
 interface ParsedAttachment {
   attachment_type: string
   file_name: string
+  mime_type: string
   issue_summary: string
+  extracted_text: string
   detected_error?: string | null
   screen_or_area?: string | null
   visible_steps: string[]
   confidence: number
   warnings: string[]
+}
+
+interface InFlightAttachment {
+  id: string
+  file_name: string
+  kind: AttachmentKind
+  status: 'parsing' | 'success' | 'error'
+  error?: string
+  parsed?: ParsedAttachment
 }
 
 const attachmentOptions: AttachmentOption[] = [
@@ -48,7 +61,7 @@ const attachmentOptions: AttachmentOption[] = [
     label: 'Image / Screenshot',
     helper: 'Parse visible UI errors',
     accept: 'image/png,image/jpeg,image/webp',
-    icon: Image,
+    icon: ImageIcon,
   },
   {
     kind: 'pdf',
@@ -70,9 +83,8 @@ export const MessageInput = ({ onSendMessage, onStop, disabled, isStreaming }: M
   const [content, setContent] = useState('')
   const [isAttachmentMenuOpen, setIsAttachmentMenuOpen] = useState(false)
   const [selectedAttachmentKind, setSelectedAttachmentKind] = useState<AttachmentKind>('image')
-  const [parsedAttachment, setParsedAttachment] = useState<ParsedAttachment | null>(null)
-  const [attachmentError, setAttachmentError] = useState<string | null>(null)
-  const [isParsingAttachment, setIsParsingAttachment] = useState(false)
+  const [inFlightAttachments, setInFlightAttachments] = useState<InFlightAttachment[]>([])
+  
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -80,27 +92,21 @@ export const MessageInput = ({ onSendMessage, onStop, disabled, isStreaming }: M
 
   const handleSend = () => {
     const userText = content.trim()
-    if ((userText || parsedAttachment) && !disabled && !isStreaming) {
-      const finalMessage = parsedAttachment
-        ? [
-            userText || 'Please investigate this attached issue.',
-            '',
-            `Attachment summary (${parsedAttachment.file_name}):`,
-            parsedAttachment.issue_summary,
-          ].join('\n')
-        : userText
+    const successfulParsed = inFlightAttachments
+      .filter((att) => att.status === 'success' && att.parsed)
+      .map((att) => att.parsed!)
 
-      onSendMessage(finalMessage.trim())
+    // Require either typed text or at least one fully parsed attachment
+    if ((userText || successfulParsed.length > 0) && !disabled && !isStreaming) {
+      onSendMessage(userText || 'Please investigate the attached issue details.', successfulParsed)
       setContent('')
-      setParsedAttachment(null)
-      setAttachmentError(null)
+      setInFlightAttachments([])
     }
   }
 
   const handleSelectAttachment = (kind: AttachmentKind) => {
     setSelectedAttachmentKind(kind)
     setIsAttachmentMenuOpen(false)
-    setAttachmentError(null)
     fileInputRef.current?.click()
   }
 
@@ -109,34 +115,49 @@ export const MessageInput = ({ onSendMessage, onStop, disabled, isStreaming }: M
     event.target.value = ''
     if (!file) return
 
-    setIsParsingAttachment(true)
-    setAttachmentError(null)
-    setParsedAttachment(null)
+    const newId = Date.now().toString()
+    const kind = selectedAttachmentKind === 'pdf' && !file.name.toLowerCase().endsWith('.pdf') ? 'log' : selectedAttachmentKind
+    
+    // Add to in-flight queue in 'parsing' state
+    const newInFlight: InFlightAttachment = {
+      id: newId,
+      file_name: file.name,
+      kind: selectedAttachmentKind,
+      status: 'parsing'
+    }
+    
+    setInFlightAttachments((prev) => [...prev, newInFlight])
 
     try {
       const formData = new FormData()
       formData.append('file', file)
-      const kind = selectedAttachmentKind === 'pdf' && !file.name.toLowerCase().endsWith('.pdf') ? 'log' : selectedAttachmentKind
       const response = await api.post<ParsedAttachment>(
         `/chat/attachments/parse?attachment_type=${kind}`,
         formData,
         { headers: { 'Content-Type': 'multipart/form-data' } }
       )
-      setParsedAttachment(response.data)
+      
+      setInFlightAttachments((prev) =>
+        prev.map((att) =>
+          att.id === newId
+            ? { ...att, status: 'success', parsed: response.data }
+            : att
+        )
+      )
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Could not parse this attachment.'
-      setAttachmentError(message)
-    } finally {
-      setIsParsingAttachment(false)
+      const message = error instanceof Error ? error.message : 'Could not parse attachment.'
+      setInFlightAttachments((prev) =>
+        prev.map((att) =>
+          att.id === newId
+            ? { ...att, status: 'error', error: message }
+            : att
+        )
+      )
     }
   }
 
-  const insertAttachmentSummary = () => {
-    if (!parsedAttachment) return
-    setContent((current) => {
-      const prefix = current.trim() ? `${current.trim()}\n\n` : ''
-      return `${prefix}${parsedAttachment.issue_summary}`
-    })
+  const removeAttachment = (id: string) => {
+    setInFlightAttachments((prev) => prev.filter((att) => att.id !== id))
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -154,6 +175,30 @@ export const MessageInput = ({ onSendMessage, onStop, disabled, isStreaming }: M
     }
   }, [content])
 
+  // Get matching styles & icon for specific attachment type
+  const getAttachmentKindSpecs = (kind: AttachmentKind) => {
+    switch (kind) {
+      case 'image':
+        return {
+          icon: ImageIcon,
+          colorClass: 'text-purple-600 bg-purple-50 border-purple-200 dark:bg-purple-950/20 dark:border-purple-900/30'
+        }
+      case 'pdf':
+        return {
+          icon: FileText,
+          colorClass: 'text-rose-600 bg-rose-50 border-rose-200 dark:bg-rose-950/20 dark:border-rose-900/30'
+        }
+      case 'video':
+        return {
+          icon: Video,
+          colorClass: 'text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-900/30'
+        }
+    }
+  }
+
+  // Check if any attachment is currently parsing
+  const isCurrentlyParsing = inFlightAttachments.some((att) => att.status === 'parsing')
+
   return (
     <div className="relative group">
       <input
@@ -165,11 +210,11 @@ export const MessageInput = ({ onSendMessage, onStop, disabled, isStreaming }: M
       />
 
       {isAttachmentMenuOpen && (
-        <div className="absolute bottom-[calc(100%+12px)] left-0 w-full max-w-[520px] rounded-xl bg-white border border-[#e0e0e0] shadow-lg p-3 z-20">
+        <div className="absolute bottom-[calc(100%+12px)] left-0 w-full max-w-[520px] rounded-2xl bg-white border border-[#e0e0e0] shadow-xl p-4 z-20 transition-all duration-200 scale-100">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <p className="text-xs font-semibold text-[#161616]">What do you want to attach?</p>
-              <p className="text-[11px] text-[#6f6f6f]">The file becomes an issue summary, then KC search continues as usual.</p>
+              <p className="text-xs font-semibold text-[#161616]">Attach evidence</p>
+              <p className="text-[11px] text-[#6f6f6f]">Files are parsed securely in-memory to inject perfect diagnostic context.</p>
             </div>
             <button
               type="button"
@@ -188,9 +233,9 @@ export const MessageInput = ({ onSendMessage, onStop, disabled, isStreaming }: M
                   key={option.kind}
                   type="button"
                   onClick={() => handleSelectAttachment(option.kind)}
-                  className="text-left rounded-lg border border-[#e0e0e0] hover:border-[#0f62fe] hover:bg-[#f4f8ff] px-3 py-3 transition-colors"
+                  className="text-left rounded-xl border border-[#e0e0e0] hover:border-[#0f62fe] hover:bg-[#f4f8ff] px-3.5 py-3 transition-all duration-200 hover:-translate-y-0.5"
                 >
-                  <Icon className="w-4 h-4 text-[#0f62fe] mb-2" />
+                  <Icon className="w-4.5 h-4.5 text-[#0f62fe] mb-2" />
                   <span className="block text-xs font-semibold text-[#161616]">{option.label}</span>
                   <span className="block text-[10px] text-[#6f6f6f] mt-1">{option.helper}</span>
                 </button>
@@ -200,124 +245,115 @@ export const MessageInput = ({ onSendMessage, onStop, disabled, isStreaming }: M
         </div>
       )}
 
-      {(isParsingAttachment || parsedAttachment || attachmentError) && (
-        <div className="mb-3 rounded-xl bg-white border border-[#e0e0e0] shadow-sm p-3">
-          {isParsingAttachment && (
-            <div className="flex items-center gap-2 text-xs text-[#525252]">
-              <Loader2 className="w-4 h-4 animate-spin text-[#0f62fe]" />
-              Parsing attachment into an issue summary...
-            </div>
-          )}
-
-          {parsedAttachment && (
-            <div className="flex flex-col gap-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-[#161616]">
-                    <CheckCircle2 className="w-4 h-4 text-[#24a148] flex-shrink-0" />
-                    Attachment parsed
-                  </div>
-                  <p className="text-[11px] text-[#6f6f6f] mt-1 truncate">{parsedAttachment.file_name}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setParsedAttachment(null)}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-[#525252] hover:bg-[#f4f4f4] flex-shrink-0"
-                  aria-label="Remove attachment summary"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="rounded-lg bg-[#f4f4f4] border border-[#e0e0e0] px-3 py-2">
-                <p className="text-xs text-[#161616] leading-relaxed line-clamp-4 whitespace-pre-line">
-                  {parsedAttachment.issue_summary}
-                </p>
-              </div>
-
-              {parsedAttachment.warnings.length > 0 && (
-                <p className="text-[11px] text-[#8a3800]">{parsedAttachment.warnings[0]}</p>
-              )}
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={insertAttachmentSummary}
-                  className="px-3 py-1.5 rounded-md bg-[#e8f0ff] text-[#0f62fe] text-[11px] font-semibold hover:bg-[#d0e2ff]"
-                >
-                  Use summary in message
-                </button>
-                <span className="text-[10px] text-[#6f6f6f]">
-                  Sending will include this summary for KC search and ticket escalation.
-                </span>
-              </div>
-            </div>
-          )}
-
-          {attachmentError && (
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-xs text-[#da1e28]">{attachmentError}</p>
-              <button
-                type="button"
-                onClick={() => setAttachmentError(null)}
-                className="text-[11px] font-semibold text-[#0f62fe]"
-              >
-                Dismiss
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="relative bg-[#ffffff] border border-[#e0e0e0] shadow-sm rounded-[20px] p-2 flex items-end gap-2 pr-4 focus-within:border-[#0f62fe] transition-all">
-        <button
-          type="button"
-          onClick={() => setIsAttachmentMenuOpen((open) => !open)}
-          disabled={disabled || isStreaming || isParsingAttachment}
-          className={cn(
-            "w-10 h-10 rounded-xl flex items-center justify-center transition-all flex-shrink-0",
-            disabled || isStreaming || isParsingAttachment
-              ? "bg-[#e0e0e0] text-[#a8a8a8] cursor-not-allowed"
-              : "bg-[#f4f4f4] text-[#525252] hover:bg-[#e8f0ff] hover:text-[#0f62fe]"
-          )}
-          aria-label="Attach issue evidence"
-          title="Attach issue evidence"
-        >
-          <Paperclip className="w-5 h-5" />
-        </button>
-
-        <div className="flex-1 relative">
-          <textarea
-            ref={textareaRef}
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Type your issue, or attach screenshot, PDF/log, or video..."
-            disabled={disabled}
-            className="w-full bg-transparent border-none focus:ring-0 text-[#161616] placeholder:text-[#a8a8a8] text-sm py-3 px-4 resize-none outline-none overflow-y-auto max-h-[200px]"
-            rows={1}
-          />
-        </div>
+      {/* Modern Integrated Chat Box Container */}
+      <div className="relative bg-[#ffffff] border border-[#e0e0e0] shadow-md rounded-[24px] p-2 flex flex-col focus-within:border-[#0f62fe] focus-within:shadow-lg focus-within:shadow-[#0f62fe]/5 transition-all duration-300">
         
-        <button
-          onClick={isStreaming ? onStop : handleSend}
-          disabled={(isStreaming ? false : (!content.trim() && !parsedAttachment)) || disabled || isParsingAttachment}
-          className={cn(
-            "w-10 h-10 rounded-xl flex items-center justify-center transition-all",
-            (isStreaming || ((content.trim() || parsedAttachment) && !disabled && !isParsingAttachment))
-              ? "bg-[#0f62fe] text-white shadow-md shadow-[#0f62fe]/20 scale-100"
-              : "bg-[#e0e0e0] text-[#a8a8a8] scale-95 cursor-not-allowed"
-          )}
-          aria-label={isStreaming ? 'Stop response' : 'Send message'}
-        >
-          {isStreaming ? (
-            <Square className="w-4 h-4 fill-current" />
-          ) : disabled ? (
-            <Sparkles className="w-5 h-5 animate-spin" />
-          ) : (
-            <Send className="w-5 h-5" />
-          )}
-        </button>
+        {/* Compact Glowing Attachment Capsules Row */}
+        {inFlightAttachments.length > 0 && (
+          <div className="flex flex-wrap gap-2 px-3 pt-2 pb-1 border-b border-[#f4f4f4] mb-1">
+            {inFlightAttachments.map((att) => {
+              const specs = getAttachmentKindSpecs(att.kind)
+              const Icon = specs.icon
+              
+              return (
+                <div
+                  key={att.id}
+                  className={cn(
+                    "flex items-center gap-2 px-2.5 py-1.5 rounded-xl border text-xs font-medium max-w-[240px] transition-all duration-300 scale-100",
+                    att.status === 'parsing' && 'border-gray-200 bg-gray-50/50 text-gray-500 animate-pulse',
+                    att.status === 'success' && specs.colorClass,
+                    att.status === 'error' && 'border-rose-200 bg-rose-50 text-rose-600'
+                  )}
+                >
+                  <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+                  
+                  <span className="truncate flex-1 max-w-[140px]" title={att.file_name}>
+                    {att.file_name}
+                  </span>
+
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {att.status === 'parsing' && (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-[#0f62fe]" />
+                    )}
+                    {att.status === 'success' && (
+                      <div className="w-3.5 h-3.5 rounded-full bg-emerald-500 text-white flex items-center justify-center scale-100 transition-transform duration-300">
+                        <Check className="w-2.5 h-2.5 stroke-[3]" />
+                      </div>
+                    )}
+                    {att.status === 'error' && (
+                      <AlertCircle className="w-3.5 h-3.5 text-rose-500" title={att.error} />
+                    )}
+                    
+                    <button
+                      type="button"
+                      onClick={() => removeAttachment(att.id)}
+                      className="w-4 h-4 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                      title="Remove attachment"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Input Bar Row */}
+        <div className="flex items-end gap-2 pr-2">
+          <button
+            type="button"
+            onClick={() => setIsAttachmentMenuOpen((open) => !open)}
+            disabled={disabled || isStreaming || isCurrentlyParsing}
+            className={cn(
+              "w-10 h-10 rounded-xl flex items-center justify-center transition-all flex-shrink-0",
+              disabled || isStreaming || isCurrentlyParsing
+                ? "bg-[#e0e0e0] text-[#a8a8a8] cursor-not-allowed"
+                : "bg-[#f4f4f4] text-[#525252] hover:bg-[#e8f0ff] hover:text-[#0f62fe]"
+            )}
+            aria-label="Attach issue evidence"
+            title="Attach issue evidence"
+          >
+            <Paperclip className="w-5 h-5" />
+          </button>
+
+          <div className="flex-1 relative">
+            <textarea
+              ref={textareaRef}
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Type your issue, or attach screenshot, PDF/log, or video..."
+              disabled={disabled}
+              className="w-full bg-transparent border-none focus:ring-0 text-[#161616] placeholder:text-[#a8a8a8] text-sm py-3 px-4 resize-none outline-none overflow-y-auto max-h-[200px]"
+              rows={1}
+            />
+          </div>
+          
+          <button
+            onClick={isStreaming ? onStop : handleSend}
+            disabled={
+              (isStreaming ? false : (!content.trim() && inFlightAttachments.filter((a) => a.status === 'success').length === 0)) ||
+              disabled ||
+              isCurrentlyParsing
+            }
+            className={cn(
+              "w-10 h-10 rounded-xl flex items-center justify-center transition-all flex-shrink-0",
+              isStreaming || ((content.trim() || inFlightAttachments.some((a) => a.status === 'success')) && !disabled && !isCurrentlyParsing)
+                ? "bg-[#0f62fe] text-white shadow-md shadow-[#0f62fe]/20 scale-100 hover:bg-[#0353e9]"
+                : "bg-[#e0e0e0] text-[#a8a8a8] scale-95 cursor-not-allowed"
+            )}
+            aria-label={isStreaming ? 'Stop response' : 'Send message'}
+          >
+            {isStreaming ? (
+              <Square className="w-4 h-4 fill-current animate-pulse" />
+            ) : disabled ? (
+              <Sparkles className="w-5 h-5 animate-spin" />
+            ) : (
+              <Send className="w-5 h-5" />
+            )}
+          </button>
+        </div>
       </div>
     </div>
   )

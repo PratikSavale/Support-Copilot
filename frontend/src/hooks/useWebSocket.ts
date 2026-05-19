@@ -167,7 +167,7 @@ export const useWebSocket = (sessionId: string | null) => {
     }
   }, [connect])
 
-  const sendMessage = (content: string) => {
+  const sendMessage = (content: string, attachments?: any[]) => {
     const msg = content.trim()
     if (!msg) return
 
@@ -196,7 +196,8 @@ export const useWebSocket = (sessionId: string | null) => {
           globalSocket.send(JSON.stringify({ 
             type: 'message',
             content: msg,
-            knowledge_sources: useUserStore.getState().selectedSources
+            knowledge_sources: useUserStore.getState().selectedSources,
+            attachments: attachments && attachments.length > 0 ? attachments : undefined
           }))
         }
       }, 1000)
@@ -209,7 +210,8 @@ export const useWebSocket = (sessionId: string | null) => {
       globalSocket.send(JSON.stringify({ 
         type: 'message',
         content: msg,
-        knowledge_sources: selectedSources.length > 0 ? selectedSources : undefined
+        knowledge_sources: selectedSources.length > 0 ? selectedSources : undefined,
+        attachments: attachments && attachments.length > 0 ? attachments : undefined
       }))
     } else {
       console.error('🚫 [WebSocket] Cannot send. State:', globalSocket?.readyState ?? 'NULL')

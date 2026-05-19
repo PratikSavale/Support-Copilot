@@ -221,7 +221,7 @@ class RAGEngine:
     # ------------------------------------------------------------------
 
     async def generate_response_stream(
-        self, query: str, context_docs: list[dict[str, Any]]
+        self, query: str, context_docs: list[dict[str, Any]], filters: dict | None = None
     ) -> AsyncIterator[str]:
         context = self._build_context(context_docs)
         messages = [{"role": "user", "content": self._build_answer_prompt(query, context)}]
@@ -235,7 +235,7 @@ class RAGEngine:
     # ------------------------------------------------------------------
 
     async def generate_response(
-        self, query: str, context_docs: list[dict[str, Any]]
+        self, query: str, context_docs: list[dict[str, Any]], filters: dict | None = None
     ) -> tuple[str, list[dict[str, Any]]]:
         """Answer the query strictly from context_docs with agentic re-searching.
 
@@ -270,7 +270,7 @@ class RAGEngine:
                 seen_queries.add(new_query)
                 logger.info("🔍 [RAG] Hop %d: re-searching for '%s'", hop, new_query)
                 
-                new_docs = await self.search(content, top_k=3)
+                new_docs = await self.search(content, top_k=3, filters=filters)
                 
                 # Merge and deduplicate by ID
                 seen_ids = {d["id"] for d in all_docs}

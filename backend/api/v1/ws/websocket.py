@@ -116,6 +116,8 @@ async def websocket_chat(
                 user_message = client_message.get("content", "").strip()
                 knowledge_sources = client_message.get("knowledge_sources", None)
 
+                attachments = client_message.get("attachments", None)
+
                 if not user_message:
                     await websocket.send_text(serialize_event({
                         "type": "error",
@@ -141,6 +143,7 @@ async def websocket_chat(
                             user_message=user_message,
                             knowledge_source_ids=knowledge_sources,
                             user_id=str(current_user.id),
+                            attachments=attachments,
                         ):
                             if "timestamp" not in event:
                                 event["timestamp"] = datetime.now(timezone.utc)

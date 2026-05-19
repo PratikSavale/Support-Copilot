@@ -157,6 +157,7 @@ class ChatService:
         user_id: str,
         follow_up_responses: list[str] | None = None,
         knowledge_source_ids: list[str] | None = None,
+        attachments: list[dict[str, Any]] | None = None,
     ) -> ChatResponse:
         """Full pipeline: store → confidence → RAG → respond.
 
@@ -175,10 +176,9 @@ class ChatService:
         if not session:
             logger.info(f"Session {session_id} not found, creating it...")
             session = await self.create_session(db, user_id=user_id, title=user_message[:80], session_id=session_id)
-            # Re-fetch or ensure session_id matches
             session_id = str(session.id)
 
-        # ── 2. Store user message ───────────────────────────────────────
+        # Store user message in DB
         await self._add_message(db, session_id, "user", user_message)
 
         # Auto-title the session on first user message.
@@ -186,18 +186,22 @@ class ChatService:
             session.title = user_message[:80].strip()
 
         # ── 3. Extract history safely ──────────────────────────────────
-        # For new sessions, messages will be empty. We avoid lazy-loading errors.
         try:
             recent_messages = session.messages[-10:] if session.messages else []
         except Exception:
-            # Relationship not loaded, likely a new session
             recent_messages = []
             
         history = [m.content for m in recent_messages]
 
+        # Construct optimized semantic search query for vector guide lookup
+        search_query = user_message
+        if attachments:
+            summaries = [f"Attachment {a.get('file_name', '')} summary: {a.get('issue_summary', '')}" for a in attachments]
+            search_query += "\n\n" + "\n".join(summaries)
+
         # ── 4. Initial confidence ───────────────────────────────────────
         initial = await self.confidence_service.calculate_initial_confidence(
-            query=user_message,
+            query=search_query,
             conversation_history=history,
             follow_up_responses=follow_up_responses,
         )
@@ -228,24 +232,40 @@ class ChatService:
         filters = None
         if knowledge_source_ids:
             filters = {"source_id": {"$in": knowledge_source_ids}}
-        search_results = await self.rag_engine.search(user_message, filters=filters)
+        search_results = await self.rag_engine.search(search_query, filters=filters)
+
+        # Build high-fidelity grounded generation query containing raw unsummarized evidence
+        generation_query = user_message
+        if attachments:
+            evidence_blocks = []
+            for a in attachments:
+                file_name = a.get("file_name", "attachment")
+                raw_text = a.get("extracted_text") or a.get("issue_summary") or ""
+                # Keep full unsummarized raw log details, capped at 15,000 characters
+                truncated_raw = raw_text[:15000]
+                evidence_blocks.append(
+                    f'<attached_evidence filename="{file_name}">\n'
+                    f'{truncated_raw}\n'
+                    f'</attached_evidence>'
+                )
+            generation_query += "\n\n" + "\n\n".join(evidence_blocks)
 
         if not search_results:
             # No docs at all → escalate immediately.
             return await self._escalate(
-                db, session_id, user_message, history, "medium"
+                db, session_id, generation_query, history, "medium"
             )
 
         # ── 5. Post-retrieval confidence ────────────────────────────────
         post = await self.confidence_service.calculate_post_retrieval_confidence(
-            query=user_message,
+            query=search_query,
             retrieved_docs=search_results,
         )
 
         # ── 6. HIGH → resolve ──────────────────────────────────────────
         if post["action"] == "resolve":
             response_text, sources = await self.rag_engine.generate_response(
-                user_message, search_results
+                generation_query, search_results, filters=filters
             )
             
             if "I_DONT_KNOW" not in response_text:
@@ -267,7 +287,7 @@ class ChatService:
         # ── 7. Fallback to base LLM (DISABLED - Escalating instead) ──────
         logger.info("RAG returned INSUFFICIENT_DOCUMENTATION or low confidence — Escalating to Jira")
         return await self._escalate(
-            db, session_id, user_message, history, "high"
+            db, session_id, generation_query, history, "high"
         )
 
         # fallback_prompt = (
@@ -312,6 +332,7 @@ class ChatService:
         user_message: str,
         user_id: str,
         knowledge_source_ids: list[str] | None = None,
+        attachments: list[dict[str, Any]] | None = None,
     ) -> AsyncIterator[dict[str, Any]]:
         """Orchestrates the pipeline and yields chunks for streaming."""
         
@@ -334,9 +355,15 @@ class ChatService:
             recent_messages = []
         history = [m.content for m in recent_messages]
 
+        # Construct optimized semantic search query for ChromaDB
+        search_query = user_message
+        if attachments:
+            summaries = [f"Attachment {a.get('file_name', '')} summary: {a.get('issue_summary', '')}" for a in attachments]
+            search_query += "\n\n" + "\n".join(summaries)
+
         # 4. Initial confidence
         initial = await self.confidence_service.calculate_initial_confidence(
-            query=user_message,
+            query=search_query,
             conversation_history=history,
         )
 
@@ -359,22 +386,21 @@ class ChatService:
             f"(5-10 words) that would best find the answer in a technical documentation vector database. "
             f"If the query is already good, return it as is. Reply ONLY with the search query.\n\n"
             f"History: {history[-3:]}\n\n"
-            f"Query: {user_message}"
+            f"Query: {search_query}"
         )
-        search_query = await self.rag_engine.llm_engine.generate_response([{"role": "user", "content": improve_prompt}])
-        search_query = search_query.strip(' \n\'"')
+        refined_search = await self.rag_engine.llm_engine.generate_response([{"role": "user", "content": improve_prompt}])
+        refined_search = refined_search.strip(' \n\'"')
 
         filters = None
         if knowledge_source_ids:
             filters = {"source_id": {"$in": knowledge_source_ids}}
-        search_results = await self.rag_engine.search(search_query, filters=filters)
+        search_results = await self.rag_engine.search(refined_search, filters=filters)
         
         # --- Multi-hop Architecture ---
-        # If we have some results, check if they are sufficient to answer the query.
         if search_results:
             context1 = self.rag_engine._build_context(search_results)
             check_prompt = (
-                f"User Query: {user_message}\n\n"
+                f"User Query: {search_query}\n\n"
                 f"Retrieved Context:\n{context1}\n\n"
                 f"Is the retrieved context sufficient to fully answer the user query? "
                 f"If YES, reply exactly with 'SUFFICIENT'. "
@@ -382,12 +408,30 @@ class ChatService:
             )
             hop_response = await self.rag_engine.llm_engine.generate_response([{"role": "user", "content": check_prompt}])
             hop_response = hop_response.strip(' \n\'"')
-        logger.debug(f"RAG search for query: '{user_message[:100]}' ")
-        search_results = await self.rag_engine.search(user_message, filters=filters)
+
+        logger.debug(f"RAG search for query: '{search_query[:100]}' ")
+        search_results = await self.rag_engine.search(search_query, filters=filters)
         logger.info(f"[DEBUG] RAG returned {len(search_results) if search_results else 0} results")
+
+        # Build high-fidelity generation query containing raw unsummarized evidence
+        generation_query = user_message
+        if attachments:
+            evidence_blocks = []
+            for a in attachments:
+                file_name = a.get("file_name", "attachment")
+                raw_text = a.get("extracted_text") or a.get("issue_summary") or ""
+                # Keep full unsummarized raw log details, capped at 15,000 characters
+                truncated_raw = raw_text[:15000]
+                evidence_blocks.append(
+                    f'<attached_evidence filename="{file_name}">\n'
+                    f'{truncated_raw}\n'
+                    f'</attached_evidence>'
+                )
+            generation_query += "\n\n" + "\n\n".join(evidence_blocks)
+
         if not search_results:
             logger.info(f"[DEBUG] No RAG results -> ESCALATING to ticket")
-            resp = await self._escalate(db, session_id, user_message, history, "medium")
+            resp = await self._escalate(db, session_id, generation_query, history, "medium")
             yield {"type": "chunk", "content": resp.response, "is_final": True}
             yield {
                 "type": "final",
@@ -399,13 +443,13 @@ class ChatService:
 
         # 7. Post-retrieval confidence
         post = await self.confidence_service.calculate_post_retrieval_confidence(
-            query=user_message,
+            query=search_query,
             retrieved_docs=search_results,
         )
         logger.info(f"[DEBUG] Post-retrieval confidence: score={post.get('score')}, action={post.get('action')}, retrieval={post.get('retrieval_score')}, relevance={post.get('relevance_score')}, completeness={post.get('completeness_score')}")
 
         # 8. Attempt Generation
-        full_response, sources = await self.rag_engine.generate_response(user_message, search_results)
+        full_response, sources = await self.rag_engine.generate_response(generation_query, search_results, filters=filters)
         
         if full_response != "INSUFFICIENT_DOCUMENTATION":
             yield {"type": "chunk", "content": full_response}
@@ -425,7 +469,7 @@ class ChatService:
 
         # 9. Fallback: INSUFFICIENT_DOCUMENTATION (DISABLED - Escalating instead)
         logger.info(f"[DEBUG] Fallback path triggered — Escalating to Jira")
-        resp = await self._escalate(db, session_id, user_message, history, "high")
+        resp = await self._escalate(db, session_id, generation_query, history, "high")
         yield {"type": "chunk", "content": resp.response, "is_final": True}
         yield {
             "type": "final",

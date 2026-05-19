@@ -48,6 +48,7 @@ class TicketInfo(BaseModel):
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1)
     follow_up_responses: list[str] | None = None
+    attachments: list[AttachmentParseResponse] | None = None
 
 
 class AttachmentParseResponse(BaseModel):

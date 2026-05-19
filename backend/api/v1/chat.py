@@ -97,6 +97,7 @@ async def send_message(
             user_message=message.message,
             follow_up_responses=message.follow_up_responses,
             user_id=str(current_user.id),
+            attachments=[a.model_dump() for a in message.attachments] if message.attachments else None,
         )
         return response
     except ValueError as exc:
