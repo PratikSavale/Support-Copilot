@@ -210,16 +210,16 @@ export const MessageInput = ({ onSendMessage, onStop, disabled, isStreaming }: M
       />
 
       {isAttachmentMenuOpen && (
-        <div className="absolute bottom-[calc(100%+12px)] left-0 w-full max-w-[520px] rounded-2xl bg-white border border-[#e0e0e0] shadow-xl p-4 z-20 transition-all duration-200 scale-100">
+        <div className="absolute bottom-[calc(100%+12px)] left-0 w-full max-w-[520px] rounded-2xl bg-white dark:bg-slate-900 border border-[#e0e0e0] dark:border-slate-800 shadow-xl p-4 z-20 transition-all duration-200 scale-100">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <p className="text-xs font-semibold text-[#161616]">Attach evidence</p>
-              <p className="text-[11px] text-[#6f6f6f]">Files are parsed securely in-memory to inject perfect diagnostic context.</p>
+              <p className="text-xs font-semibold text-[#161616] dark:text-white">Attach evidence</p>
+              <p className="text-[11px] text-[#6f6f6f] dark:text-slate-400">Files are parsed securely in-memory to inject perfect diagnostic context.</p>
             </div>
             <button
               type="button"
               onClick={() => setIsAttachmentMenuOpen(false)}
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-[#525252] hover:bg-[#f4f4f4]"
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-[#525252] dark:text-slate-400 hover:bg-[#f4f4f4] dark:hover:bg-slate-800"
               aria-label="Close attachment menu"
             >
               <X className="w-4 h-4" />
@@ -233,11 +233,11 @@ export const MessageInput = ({ onSendMessage, onStop, disabled, isStreaming }: M
                   key={option.kind}
                   type="button"
                   onClick={() => handleSelectAttachment(option.kind)}
-                  className="text-left rounded-xl border border-[#e0e0e0] hover:border-[#0f62fe] hover:bg-[#f4f8ff] px-3.5 py-3 transition-all duration-200 hover:-translate-y-0.5"
+                  className="text-left rounded-xl border border-[#e0e0e0] dark:border-slate-800 hover:border-[#0f62fe] dark:hover:border-blue-400 hover:bg-[#f4f8ff] dark:hover:bg-slate-800 px-3.5 py-3 transition-all duration-200 hover:-translate-y-0.5"
                 >
-                  <Icon className="w-4.5 h-4.5 text-[#0f62fe] mb-2" />
-                  <span className="block text-xs font-semibold text-[#161616]">{option.label}</span>
-                  <span className="block text-[10px] text-[#6f6f6f] mt-1">{option.helper}</span>
+                  <Icon className="w-4.5 h-4.5 text-[#0f62fe] dark:text-blue-400 mb-2" />
+                  <span className="block text-xs font-semibold text-[#161616] dark:text-white">{option.label}</span>
+                  <span className="block text-[10px] text-[#6f6f6f] dark:text-slate-400 mt-1">{option.helper}</span>
                 </button>
               )
             })}
@@ -246,11 +246,11 @@ export const MessageInput = ({ onSendMessage, onStop, disabled, isStreaming }: M
       )}
 
       {/* Modern Integrated Chat Box Container */}
-      <div className="relative bg-[#ffffff] border border-[#e0e0e0] shadow-md rounded-[24px] p-2 flex flex-col focus-within:border-[#0f62fe] focus-within:shadow-lg focus-within:shadow-[#0f62fe]/5 transition-all duration-300">
+      <div className="relative bg-[#ffffff] dark:bg-slate-900 border border-[#e0e0e0] dark:border-slate-800 shadow-md rounded-[24px] p-2 flex flex-col focus-within:border-[#0f62fe] dark:focus-within:border-blue-500 focus-within:shadow-lg focus-within:shadow-[#0f62fe]/5 transition-all duration-300">
         
         {/* Compact Glowing Attachment Capsules Row */}
         {inFlightAttachments.length > 0 && (
-          <div className="flex flex-wrap gap-2 px-3 pt-2 pb-1 border-b border-[#f4f4f4] mb-1">
+          <div className="flex flex-wrap gap-2 px-3 pt-2 pb-1 border-b border-[#f4f4f4] dark:border-slate-800 mb-1">
             {inFlightAttachments.map((att) => {
               const specs = getAttachmentKindSpecs(att.kind)
               const Icon = specs.icon
@@ -260,7 +260,7 @@ export const MessageInput = ({ onSendMessage, onStop, disabled, isStreaming }: M
                   key={att.id}
                   className={cn(
                     "flex items-center gap-2 px-2.5 py-1.5 rounded-xl border text-xs font-medium max-w-[240px] transition-all duration-300 scale-100",
-                    att.status === 'parsing' && 'border-gray-200 bg-gray-50/50 text-gray-500 animate-pulse',
+                    att.status === 'parsing' && 'border-gray-200 dark:border-slate-850 bg-gray-50/50 dark:bg-slate-800/50 text-gray-500 dark:text-slate-400 animate-pulse',
                     att.status === 'success' && specs.colorClass,
                     att.status === 'error' && 'border-rose-200 bg-rose-50 text-rose-600'
                   )}
@@ -308,15 +308,15 @@ export const MessageInput = ({ onSendMessage, onStop, disabled, isStreaming }: M
             className={cn(
               "w-10 h-10 rounded-xl flex items-center justify-center transition-all flex-shrink-0",
               disabled || isStreaming || isCurrentlyParsing
-                ? "bg-[#e0e0e0] text-[#a8a8a8] cursor-not-allowed"
-                : "bg-[#f4f4f4] text-[#525252] hover:bg-[#e8f0ff] hover:text-[#0f62fe]"
+                ? "bg-[#e0e0e0] dark:bg-slate-800 text-[#a8a8a8] dark:text-slate-600 cursor-not-allowed"
+                : "bg-[#f4f4f4] dark:bg-slate-800 text-[#525252] dark:text-slate-300 hover:bg-[#e8f0ff] dark:hover:bg-slate-700 hover:text-[#0f62fe] dark:hover:text-blue-400"
             )}
             aria-label="Attach issue evidence"
             title="Attach issue evidence"
           >
             <Paperclip className="w-5 h-5" />
           </button>
-
+ 
           <div className="flex-1 relative">
             <textarea
               ref={textareaRef}
@@ -325,7 +325,7 @@ export const MessageInput = ({ onSendMessage, onStop, disabled, isStreaming }: M
               onKeyDown={handleKeyDown}
               placeholder="Type your issue, or attach screenshot, PDF/log, or video..."
               disabled={disabled}
-              className="w-full bg-transparent border-none focus:ring-0 text-[#161616] placeholder:text-[#a8a8a8] text-sm py-3 px-4 resize-none outline-none overflow-y-auto max-h-[200px]"
+              className="w-full bg-transparent border-none focus:ring-0 text-[#161616] dark:text-white placeholder:text-[#a8a8a8] dark:placeholder:text-slate-500 text-sm py-3 px-4 resize-none outline-none overflow-y-auto max-h-[200px]"
               rows={1}
             />
           </div>
@@ -340,8 +340,8 @@ export const MessageInput = ({ onSendMessage, onStop, disabled, isStreaming }: M
             className={cn(
               "w-10 h-10 rounded-xl flex items-center justify-center transition-all flex-shrink-0",
               isStreaming || ((content.trim() || inFlightAttachments.some((a) => a.status === 'success')) && !disabled && !isCurrentlyParsing)
-                ? "bg-[#0f62fe] text-white shadow-md shadow-[#0f62fe]/20 scale-100 hover:bg-[#0353e9]"
-                : "bg-[#e0e0e0] text-[#a8a8a8] scale-95 cursor-not-allowed"
+                ? "bg-[#0f62fe] dark:bg-blue-600 text-white shadow-md shadow-[#0f62fe]/20 dark:shadow-blue-500/10 scale-100 hover:bg-[#0353e9] dark:hover:bg-blue-500"
+                : "bg-[#e0e0e0] dark:bg-slate-800 text-[#a8a8a8] dark:text-slate-600 scale-95 cursor-not-allowed"
             )}
             aria-label={isStreaming ? 'Stop response' : 'Send message'}
           >

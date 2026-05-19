@@ -98,8 +98,8 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
       )}
     >
       {isAI && (
-        <div className="w-8 h-8 rounded-lg bg-[#ffffff] border border-[#e0e0e0] flex items-center justify-center flex-shrink-0 mt-1 shadow-sm">
-          <Bot className="w-5 h-5 text-[#0f62fe]" />
+        <div className="w-8 h-8 rounded-lg bg-[#ffffff] dark:bg-slate-800 border border-[#e0e0e0] dark:border-slate-700 flex items-center justify-center flex-shrink-0 mt-1 shadow-sm transition-colors">
+          <Bot className="w-5 h-5 text-[#0f62fe] dark:text-blue-400" />
         </div>
       )}
 
@@ -108,16 +108,16 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
           className={cn(
             "px-5 py-3.5 rounded-2xl relative transition-all",
             isAI 
-              ? "bg-white border border-[#e0e0e0] text-[#161616] shadow-sm" 
+              ? "bg-white dark:bg-slate-900 border border-[#e0e0e0] dark:border-slate-800 text-[#161616] dark:text-slate-200 shadow-sm" 
               : "bg-[#0f62fe] text-white shadow-md shadow-[#0f62fe]/20"
           )}
         >
           <div className={cn(
-            "text-sm leading-relaxed prose prose-sm max-w-none text-[#161616] break-words overflow-x-auto",
-            "prose-p:leading-relaxed prose-pre:bg-[#f4f4f4] prose-pre:border prose-pre:border-[#e0e0e0] prose-pre:overflow-x-auto prose-p:text-[#161616] prose-strong:text-[#161616]",
-            "prose-headings:text-[#161616] prose-headings:font-semibold prose-headings:mt-4 prose-headings:mb-2",
-            "prose-a:text-[#0f62fe] hover:prose-a:text-[#0f62fe]/80",
-            "prose-code:text-[#0f62fe] prose-code:bg-[#f4f4f4] prose-code:px-1 prose-code:rounded prose-code:before:content-none prose-code:after:content-none",
+            "text-sm leading-relaxed prose prose-sm max-w-none text-[#161616] dark:text-slate-200 break-words overflow-x-auto",
+            "prose-p:leading-relaxed prose-pre:bg-[#f4f4f4] dark:prose-pre:bg-slate-950 prose-pre:border prose-pre:border-[#e0e0e0] dark:prose-pre:border-slate-800 prose-pre:overflow-x-auto prose-p:text-[#161616] dark:prose-p:text-slate-200 prose-strong:text-[#161616] dark:prose-strong:text-white",
+            "prose-headings:text-[#161616] dark:prose-headings:text-white prose-headings:font-semibold prose-headings:mt-4 prose-headings:mb-2",
+            "prose-a:text-[#0f62fe] dark:prose-a:text-blue-400 hover:prose-a:text-[#0f62fe]/80",
+            "prose-code:text-[#0f62fe] dark:prose-code:text-blue-400 prose-code:bg-[#f4f4f4] dark:prose-code:bg-slate-950 prose-code:px-1 prose-code:rounded prose-code:before:content-none prose-code:after:content-none",
             !isAI && "prose-headings:text-white prose-p:text-white prose-strong:text-white prose-code:text-white prose-code:bg-black/20"
           )}>
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -125,16 +125,16 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
             </ReactMarkdown>
             {!message.content && isAI && (
               <div className="flex gap-1 items-center py-2">
-                <span className="w-1.5 h-1.5 bg-[#0f62fe] rounded-full animate-bounce [animation-delay:-0.3s]" />
-                <span className="w-1.5 h-1.5 bg-[#0f62fe] rounded-full animate-bounce [animation-delay:-0.15s]" />
-                <span className="w-1.5 h-1.5 bg-[#0f62fe] rounded-full animate-bounce" />
+                <span className="w-1.5 h-1.5 bg-[#0f62fe] dark:bg-blue-450 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                <span className="w-1.5 h-1.5 bg-[#0f62fe] dark:bg-blue-450 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                <span className="w-1.5 h-1.5 bg-[#0f62fe] dark:bg-blue-450 rounded-full animate-bounce" />
               </div>
             )}
           </div>
 
           {/* Action & Feedback Indicators */}
           {isAI && message.action && (
-            <div className="mt-3 pt-3 border-t border-[#e0e0e0] flex items-center justify-between">
+            <div className="mt-3 pt-3 border-t border-[#e0e0e0] dark:border-slate-800 flex items-center justify-between">
               <div className={cn(
                 "flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider",
                 message.action === 'resolve' && "text-[#24a148]",
@@ -149,18 +149,18 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
 
               {/* Feedback buttons for Resolved action */}
               {message.action === 'resolve' && feedback === 'none' && (
-                <div className="flex items-center gap-1.5 bg-[#f4f4f4] rounded-lg p-0.5 border border-[#e0e0e0] dark:bg-black/10">
+                <div className="flex items-center gap-1.5 bg-[#f4f4f4] dark:bg-slate-800 rounded-lg p-0.5 border border-[#e0e0e0] dark:border-slate-700">
                   <button
                     onClick={() => handleFeedback('success')}
-                    className="p-1 rounded hover:bg-[#e8f0ff] hover:text-[#0f62fe] text-[#525252] transition-colors"
+                    className="p-1 rounded hover:bg-[#e8f0ff] dark:hover:bg-slate-700 hover:text-[#0f62fe] dark:hover:text-blue-400 text-[#525252] dark:text-slate-300 transition-colors"
                     title="This solved my issue"
                   >
                     <ThumbsUp className="w-3.5 h-3.5" />
                   </button>
-                  <div className="w-[1px] h-3 bg-[#e0e0e0]" />
+                  <div className="w-[1px] h-3 bg-[#e0e0e0] dark:bg-slate-700" />
                   <button
                     onClick={() => handleFeedback('failed')}
-                    className="p-1 rounded hover:bg-[#fff1f1] hover:text-[#da1e28] text-[#525252] transition-colors"
+                    className="p-1 rounded hover:bg-[#fff1f1] dark:hover:bg-slate-700 hover:text-[#da1e28] dark:hover:text-rose-400 text-[#525252] dark:text-slate-300 transition-colors"
                     title="This did not work"
                   >
                     <ThumbsDown className="w-3.5 h-3.5" />
@@ -184,10 +184,10 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
 
           {/* Feedback Escalation Prompt Card */}
           {feedback === 'disliked' && !escalationResult && (
-            <div className="mt-3 pt-3 border-t border-[#e0e0e0] text-xs">
-              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 dark:bg-rose-950/10 dark:border-rose-900/30 flex flex-col gap-2">
+            <div className="mt-3 pt-3 border-t border-[#e0e0e0] dark:border-slate-800 text-xs">
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 dark:bg-rose-950/20 dark:border-rose-900/30 flex flex-col gap-2">
                 <span className="font-semibold text-rose-700 dark:text-rose-400">Sorry that didn't help!</span>
-                <span className="text-[#525252] text-[11px]">Would you like to escalate this directly to our engineering support team on Jira?</span>
+                <span className="text-[#525252] dark:text-slate-400 text-[11px]">Would you like to escalate this directly to our engineering support team on Jira?</span>
                 <button
                   disabled={isEscating}
                   onClick={handleEscalate}
@@ -207,8 +207,8 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
 
           {/* Inline Escalated Ticket Card (if manually escalated just now) */}
           {escalationResult && !isEscalated && (
-            <div className="mt-3 pt-3 border-t border-[#e0e0e0]">
-              <div className="flex flex-col gap-2 px-3 py-2.5 rounded-md bg-[#fff1f1] border border-[#da1e28]/20 group cursor-pointer hover:bg-[#fff1f1]/80 transition-colors"
+            <div className="mt-3 pt-3 border-t border-[#e0e0e0] dark:border-slate-800">
+              <div className="flex flex-col gap-2 px-3 py-2.5 rounded-md bg-[#fff1f1] dark:bg-rose-950/20 border border-[#da1e28]/20 dark:border-rose-900/30 group cursor-pointer hover:bg-[#fff1f1]/80 dark:hover:bg-rose-950/30 transition-colors"
                 onClick={() => {
                   if (escalationResult.ticket?.jira_url) {
                     window.open(escalationResult.ticket.jira_url, '_blank', 'noopener,noreferrer')
@@ -221,7 +221,7 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
                   <div className="flex items-center gap-2">
                     <AlertCircle className="w-3.5 h-3.5 text-[#da1e28] flex-shrink-0" />
                     <div>
-                      <span className="text-[11px] font-semibold text-[#161616] block">
+                      <span className="text-[11px] font-semibold text-[#161616] dark:text-rose-100 block">
                         Jira Ticket Created
                       </span>
                     </div>
@@ -237,10 +237,10 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
                 </div>
                 
                 <div className="pl-[22px]">
-                  <p className="text-[10px] text-[#525252] mb-1.5">
+                  <p className="text-[10px] text-[#525252] dark:text-slate-400 mb-1.5">
                     Your request has been escalated. Our engineering support team is on it!
                   </p>
-                  <span className="text-[10px] font-mono font-medium text-[#161616] bg-white px-2 py-0.5 rounded border border-[#e0e0e0]">
+                  <span className="text-[10px] font-mono font-medium text-[#161616] dark:text-white bg-white dark:bg-slate-800 px-2 py-0.5 rounded border border-[#e0e0e0] dark:border-slate-700">
                     {escalationResult.ticket?.jira_issue_key || escalationResult.jira_key}
                   </span>
                 </div>
@@ -250,8 +250,8 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
 
           {/* State 1: RAG hit — source chips */}
           {isRagHit && (
-            <div className="mt-3 pt-3 border-t border-[#e0e0e0] text-xs">
-              <span className="text-[#6f6f6f] text-[10px] font-normal mb-1 block">Sources consulted</span>
+            <div className="mt-3 pt-3 border-t border-[#e0e0e0] dark:border-slate-800 text-xs">
+              <span className="text-[#6f6f6f] dark:text-slate-400 text-[10px] font-normal mb-1 block">Sources consulted</span>
               <SourceChips
                 sources={message.sources!}
                 activeIndex={activePanelIdx}
@@ -262,10 +262,10 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
 
           {/* State 2: Gemini fallback — amber badge, no chips */}
           {isGeminiFallback && (
-            <div className="mt-3 pt-3 border-t border-[#e0e0e0]">
-              <div className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-[#fdf6e3] border border-[#f1c21b]/30">
-                <BrainCircuit className="w-3.5 h-3.5 text-[#b28600] flex-shrink-0" />
-                <span className="text-[11px] text-[#6e4b00] font-medium">
+            <div className="mt-3 pt-3 border-t border-[#e0e0e0] dark:border-slate-800">
+              <div className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-[#fdf6e3] dark:bg-amber-950/20 border border-[#f1c21b]/30 dark:border-amber-900/30">
+                <BrainCircuit className="w-3.5 h-3.5 text-[#b28600] dark:text-amber-400 flex-shrink-0" />
+                <span className="text-[11px] text-[#6e4b00] dark:text-amber-250 font-medium">
                   Answered from general knowledge · not from your docs
                 </span>
               </div>
@@ -274,8 +274,8 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
 
           {/* State 3: Escalated ticket — card with ticket ID, no chips */}
           {isEscalated && (
-            <div className="mt-3 pt-3 border-t border-[#e0e0e0]">
-              <div className="flex flex-col gap-2 px-3 py-2.5 rounded-md bg-[#fff1f1] border border-[#da1e28]/20 group cursor-pointer hover:bg-[#fff1f1]/80 transition-colors"
+            <div className="mt-3 pt-3 border-t border-[#e0e0e0] dark:border-slate-800">
+              <div className="flex flex-col gap-2 px-3 py-2.5 rounded-md bg-[#fff1f1] dark:bg-rose-950/20 border border-[#da1e28]/20 dark:border-rose-900/30 group cursor-pointer hover:bg-[#fff1f1]/80 dark:hover:bg-rose-950/30 transition-colors"
                 onClick={() => {
                   if (message.ticket?.jira_url) {
                     window.open(message.ticket.jira_url, '_blank', 'noopener,noreferrer')
@@ -288,7 +288,7 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
                   <div className="flex items-center gap-2">
                     <AlertCircle className="w-3.5 h-3.5 text-[#da1e28] flex-shrink-0" />
                     <div>
-                      <span className="text-[11px] font-semibold text-[#161616] block">
+                      <span className="text-[11px] font-semibold text-[#161616] dark:text-rose-100 block">
                         Ticket created
                       </span>
                     </div>
@@ -304,10 +304,10 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
                 </div>
                 
                 <div className="pl-[22px]">
-                  <p className="text-[10px] text-[#525252] mb-1.5">
+                  <p className="text-[10px] text-[#525252] dark:text-slate-400 mb-1.5">
                     Your request has been escalated. You can track the progress using the ticket ID below.
                   </p>
-                  <span className="text-[10px] font-mono font-medium text-[#161616] bg-white px-2 py-0.5 rounded border border-[#e0e0e0]">
+                  <span className="text-[10px] font-mono font-medium text-[#161616] dark:text-white bg-white dark:bg-slate-800 px-2 py-0.5 rounded border border-[#e0e0e0] dark:border-slate-700">
                     {message.ticket?.jira_issue_key || `TKT-${message.id?.slice(0, 8).toUpperCase()}`}
                   </span>
                 </div>
@@ -315,7 +315,7 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
             </div>
           )}
           
-          <span className="text-[10px] text-[#a8a8a8] absolute bottom-[-18px] right-2 font-medium">
+          <span className="text-[10px] text-[#a8a8a8] dark:text-slate-500 absolute bottom-[-18px] right-2 font-medium">
             {displayTime}
           </span>
         </div>
@@ -329,8 +329,8 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
       </div>
 
       {!isAI && (
-        <div className="w-8 h-8 rounded-lg bg-[#ffffff] border border-[#e0e0e0] flex items-center justify-center flex-shrink-0 mt-1 shadow-sm">
-          <User className="w-5 h-5 text-[#525252]" />
+        <div className="w-8 h-8 rounded-lg bg-[#ffffff] dark:bg-slate-800 border border-[#e0e0e0] dark:border-slate-700 flex items-center justify-center flex-shrink-0 mt-1 shadow-sm transition-colors">
+          <User className="w-5 h-5 text-[#525252] dark:text-slate-400" />
         </div>
       )}
 

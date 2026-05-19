@@ -7,7 +7,7 @@ interface UserLayoutProps {
 
 export const UserLayout = ({ children }: UserLayoutProps) => {
   return (
-    <div className="relative min-h-screen flex flex-col bg-[#f4f4f4]">
+    <div className="relative min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
 
       <Header />
       

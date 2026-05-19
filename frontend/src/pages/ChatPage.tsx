@@ -72,11 +72,11 @@ export const ChatPage = () => {
                 animate={{ opacity: 1, y: 0 }}
                 className="h-full flex flex-col items-center justify-center text-center px-6"
               >
-                <div className="w-16 h-16 rounded-2xl bg-[#ffffff] border border-[#e0e0e0] flex items-center justify-center mb-6 shadow-sm">
-                  <Sparkles className="w-8 h-8 text-[#0f62fe]" />
+                <div className="w-16 h-16 rounded-2xl bg-[#ffffff] dark:bg-slate-900 border border-[#e0e0e0] dark:border-slate-800 flex items-center justify-center mb-6 shadow-sm">
+                  <Sparkles className="w-8 h-8 text-[#0f62fe] dark:text-blue-400" />
                 </div>
-                <h2 className="text-2xl font-bold text-[#161616] mb-2">How can I help you today?</h2>
-                <p className="text-[#525252] max-w-sm text-sm">
+                <h2 className="text-2xl font-bold text-[#161616] dark:text-white mb-2">How can I help you today?</h2>
+                <p className="text-[#525252] dark:text-slate-400 max-w-sm text-sm">
                   I'm your AI-powered L2 support agent. I can help resolve technical issues, clarify documentation, or escalate to a human if needed.
                 </p>
                 
@@ -90,9 +90,9 @@ export const ChatPage = () => {
                     <button
                       key={suggestion}
                       onClick={() => sendMessage(suggestion)}
-                      className="text-left px-4 py-3 rounded-xl bg-[#ffffff] border border-[#e0e0e0] hover:bg-[#f4f4f4] transition-colors text-xs text-[#525252] flex items-center gap-2 group shadow-sm"
+                      className="text-left px-4 py-3 rounded-xl bg-[#ffffff] dark:bg-slate-900 border border-[#e0e0e0] dark:border-slate-800 hover:bg-[#f4f4f4] dark:hover:bg-slate-800 text-xs text-[#525252] dark:text-slate-300 flex items-center gap-2 group shadow-sm transition-all duration-200"
                     >
-                      <MessageSquare className="w-3.5 h-3.5 group-hover:text-[#0f62fe] transition-colors" />
+                      <MessageSquare className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#0f62fe] dark:group-hover:text-blue-400 transition-colors" />
                       {suggestion}
                     </button>
                   ))}
@@ -116,7 +116,7 @@ export const ChatPage = () => {
             disabled={!isConnected} 
           />
           <div className="mt-3 flex items-center justify-center gap-4">
-             <p className="text-[10px] text-[#a8a8a8] uppercase tracking-widest font-medium">
+             <p className="text-[10px] text-[#a8a8a8] dark:text-slate-500 uppercase tracking-widest font-medium">
                Shift + Enter for new line
              </p>
              <button 
@@ -125,7 +125,7 @@ export const ChatPage = () => {
                  const newId = crypto.randomUUID()
                  navigate(`/chat/${newId}`)
                }}
-               className="text-[10px] text-[#0f62fe]/60 hover:text-[#0f62fe] uppercase tracking-widest font-bold transition-colors"
+               className="text-[10px] text-[#0f62fe]/60 dark:text-blue-400/60 hover:text-[#0f62fe] dark:hover:text-blue-400 uppercase tracking-widest font-bold transition-colors"
              >
                New Chat
              </button>
