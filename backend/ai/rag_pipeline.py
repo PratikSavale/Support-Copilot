@@ -176,36 +176,112 @@ class RAGEngine:
         top_k: int | None = None,
         filters: dict | None = None,
     ) -> list[dict[str, Any]]:
-        """Vector search in ChromaDB. Returns rows sorted by similarity desc."""
+        """Hybrid search combining Dense Vector Similarity and Sparse BM25 Keywords via RRF."""
         k = top_k or self.top_k
+        
+        # 1. Fetch Dense Vector candidates
         query_embedding = await self.embedding_engine.embed_query(query)
+        dense_k = max(k * 3, 20)
         query_kwargs: dict[str, Any] = {
             "query_embeddings": [query_embedding],
-            "n_results": k,
+            "n_results": dense_k,
         }
         if filters:
             query_kwargs["where"] = filters
 
         result = await asyncio.to_thread(self.collection.query, **query_kwargs)
 
-        ids       = result.get("ids",       [[]])[0]
-        docs      = result.get("documents", [[]])[0]
-        metadatas = result.get("metadatas", [[]])[0]
-        distances = result.get("distances", [[]])[0]
+        dense_ids       = result.get("ids",       [[]])[0]
+        dense_docs      = result.get("documents", [[]])[0]
+        dense_metadatas = result.get("metadatas", [[]])[0]
+        dense_distances = result.get("distances", [[]])[0]
 
-        rows: list[dict[str, Any]] = []
-        for i in range(len(ids)):
-            dist = distances[i] if i < len(distances) else 1.0
-            rows.append(
-                {
-                    "id":         ids[i],
-                    "content":    _clean_chunk(docs[i]),  # clean on read too
-                    "metadata":   metadatas[i] or {},
-                    "distance":   dist,
-                    "similarity": round(1.0 - float(dist), 4),
-                }
-            )
-        return rows
+        dense_rows = []
+        for i in range(len(dense_ids)):
+            dist = dense_distances[i] if i < len(dense_distances) else 1.0
+            dense_rows.append({
+                "id":         dense_ids[i],
+                "content":    _clean_chunk(dense_docs[i]),
+                "metadata":   dense_metadatas[i] or {},
+                "distance":   dist,
+                "similarity": round(1.0 - float(dist), 4),
+            })
+
+        # 2. Fetch/Build Sparse BM25 Ranker
+        corpus_ids = []
+        corpus_docs = []
+        corpus_metadatas = []
+        
+        # Only load the whole active subset if filtered and small enough to avoid scanning massive DBs
+        if filters:
+            try:
+                corp = await asyncio.to_thread(
+                    self.collection.get,
+                    where=filters,
+                    include=["documents", "metadatas"]
+                )
+                corpus_ids = corp.get("ids", [])
+                corpus_docs = corp.get("documents", [])
+                corpus_metadatas = corp.get("metadatas", [])
+            except Exception as e:
+                logger.warning("Failed to fetch full sparse corpus from ChromaDB: %s", e)
+
+        # Fallback to dense candidates if no filters are applied, or collection.get is empty/large
+        if not corpus_ids or len(corpus_ids) > 1000:
+            corpus_ids = [d["id"] for d in dense_rows]
+            corpus_docs = [d["content"] for d in dense_rows]
+            corpus_metadatas = [d["metadata"] for d in dense_rows]
+
+        # Calculate BM25 scores
+        from utils.bm25 import BM25Ranker
+        sparse_rows = []
+        if corpus_docs:
+            try:
+                bm25 = BM25Ranker(corpus_docs)
+                bm25_scores = bm25.score(query)
+                
+                # Pair and sort by BM25 score
+                sparse_candidates = []
+                for idx in range(len(corpus_ids)):
+                    if bm25_scores[idx] > 0.0:
+                        sparse_candidates.append({
+                            "id": corpus_ids[idx],
+                            "content": _clean_chunk(corpus_docs[idx]),
+                            "metadata": corpus_metadatas[idx] or {},
+                            "bm25_score": bm25_scores[idx],
+                            "distance": 0.5,
+                            "similarity": 0.5
+                        })
+                sparse_candidates.sort(key=lambda x: x["bm25_score"], reverse=True)
+                sparse_rows = sparse_candidates[:dense_k]
+            except Exception as e:
+                logger.error("Failed executing sparse BM25 search: %s", e)
+
+        # 3. Reciprocal Rank Fusion (RRF)
+        rrf_scores: dict[str, float] = {}
+        doc_registry: dict[str, dict[str, Any]] = {}
+
+        # Register dense candidates
+        for rank, row in enumerate(dense_rows, 1):
+            doc_id = row["id"]
+            doc_registry[doc_id] = row
+            rrf_scores[doc_id] = rrf_scores.get(doc_id, 0.0) + (1.0 / (60.0 + rank))
+
+        # Register sparse candidates
+        for rank, row in enumerate(sparse_rows, 1):
+            doc_id = row["id"]
+            if doc_id not in doc_registry:
+                doc_registry[doc_id] = row
+            rrf_scores[doc_id] = rrf_scores.get(doc_id, 0.0) + (1.0 / (60.0 + rank))
+
+        # Sort all registered documents by RRF score descending
+        fused_ids = sorted(rrf_scores.keys(), key=lambda x: rrf_scores[x], reverse=True)
+        
+        final_rows = []
+        for doc_id in fused_ids[:k]:
+            final_rows.append(doc_registry[doc_id])
+
+        return final_rows
 
     async def _generate_hypothetical_doc(self, query: str) -> str:
         """Use LLM to generate a hypothetical ideal answer to the query (HyDE)."""

@@ -133,6 +133,26 @@ class TicketService:
         severity: str = "medium",
     ) -> Ticket:
         """Create a ticket from manual admin escalation."""
+        import uuid
+        
+        # Retrieve actual session messages from database to build detailed ticket info
+        session = await db.get(Session, uuid.UUID(session_id))
+        if session:
+            await db.refresh(session, ["messages"])
+            if not conversation_history and session.messages:
+                conversation_history = []
+                for m in session.messages:
+                    role_str = m.role.value if hasattr(m.role, "value") else str(m.role)
+                    conversation_history.append(f"{role_str}: {m.content}")
+            
+            if not query and session.messages:
+                # Find the latest user query from the session
+                for m in reversed(session.messages):
+                    role_str = m.role.value if hasattr(m.role, "value") else str(m.role)
+                    if role_str == "user":
+                        query = m.content
+                        break
+
         return await self.create_ticket_from_chat(
             db=db,
             session_id=session_id,
