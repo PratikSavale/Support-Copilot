@@ -100,6 +100,25 @@ class JiraClient:
             logger.info("[JiraClient.create_ticket] Using MOCK mode - returning fake key")
             return self._mock_create_ticket(ticket, issue_type)
 
+        # Automatically fallback to a valid issue type if default is not available in project
+        try:
+            available_types = await self.get_issue_types(project_key=self.project_key)
+            available_names = {it["name"].lower(): it["name"] for it in available_types}
+            
+            requested_lower = issue_type.lower() if issue_type else ""
+            if requested_lower in available_names:
+                issue_type = available_names[requested_lower]
+            else:
+                if "task" in available_names:
+                    issue_type = available_names["task"]
+                elif "story" in available_names:
+                    issue_type = available_names["story"]
+                elif available_types:
+                    issue_type = available_types[0]["name"]
+                logger.info(f"[JiraClient.create_ticket] Fell back to available issue type: {issue_type}")
+        except Exception as e:
+            logger.warning(f"[JiraClient.create_ticket] Failed to fetch issue types: {e}")
+
         # Build description sections from ticket fields
         description_parts: list[dict[str, Any]] = []
 
