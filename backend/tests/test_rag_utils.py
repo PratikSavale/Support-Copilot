@@ -54,3 +54,20 @@ def test_clean_chunk_combined():
     assert "HTML" in cleaned
     assert "http://bare.url" not in cleaned
     assert "End of doc." in cleaned
+
+
+def test_parent_child_splitting():
+    from utils.text_splitter import TextSplitter
+    splitter = TextSplitter()
+    
+    # Create long text (over 2000 chars) that will yield clear parent & child structures
+    paragraph = "This is a high quality prose paragraph designed to pass the sentence filters. " * 30
+    results = splitter.split_parent_child(paragraph)
+    
+    assert len(results) > 0
+    first = results[0]
+    assert "child_content" in first
+    assert "parent_content" in first
+    assert len(first["child_content"]) < len(first["parent_content"])
+    assert first["child_content"] in first["parent_content"]
+

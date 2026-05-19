@@ -153,14 +153,18 @@ class KnowledgeService:
                 if not pages:
                     raise ValueError("All fetched pages were filtered out as low-quality content")
 
-                # 3. Split into chunks, preserving page URLs.
+                # 3. Split into chunks using Parent-Child strategy, preserving page URLs.
                 chunks_with_metadata = []
                 for p in pages:
-                    p_chunks = self.text_splitter.split_text(p["content"])
-                    for c in p_chunks:
-                        chunks_with_metadata.append({"content": c, "url": p["url"]})
+                    pc_pairs = self.text_splitter.split_parent_child(p["content"])
+                    for pair in pc_pairs:
+                        chunks_with_metadata.append({
+                            "content": pair["child_content"],
+                            "parent_content": pair["parent_content"],
+                            "url": p["url"]
+                        })
                 
-                logger.info("Split into %d chunks across %d cleaned pages", len(chunks_with_metadata), len(pages))
+                logger.info("Split into %d chunks across %d cleaned pages using Parent-Child strategy", len(chunks_with_metadata), len(pages))
 
                 # 3. Add to ChromaDB (embeddings generated internally).
                 chunk_count = await self.rag_engine.add_documents(

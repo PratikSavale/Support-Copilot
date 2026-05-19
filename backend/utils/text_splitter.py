@@ -75,7 +75,7 @@ def _is_quality_chunk(chunk: str) -> bool:
 
 
 class TextSplitter:
-    """Split long text into overlapping chunks with quality filtering."""
+    """Split long text into overlapping chunks with quality filtering, with Parent-Child support."""
 
     def __init__(self, chunk_size: int = 500, chunk_overlap: int = 100) -> None:
         self.splitter = RecursiveCharacterTextSplitter(
@@ -84,10 +84,37 @@ class TextSplitter:
             length_function=len,
             separators=["\n\n", "\n", ". ", " ", ""],
         )
+        self.parent_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=2000,
+            chunk_overlap=200,
+            length_function=len,
+            separators=["\n\n", "\n", ". ", " ", ""],
+        )
 
     def split_text(self, text: str) -> list[str]:
         raw_chunks = self.splitter.split_text(text)
         return [c for c in raw_chunks if _is_quality_chunk(c)]
+
+    def split_parent_child(self, text: str) -> list[dict[str, str]]:
+        """Split text into large parent chunks, then split each parent into small child chunks.
+        
+        Returns:
+            list[dict]: List of {"child_content": str, "parent_content": str}
+        """
+        raw_parents = self.parent_splitter.split_text(text)
+        parent_chunks = [p for p in raw_parents if _is_quality_chunk(p)]
+        
+        results = []
+        for p in parent_chunks:
+            raw_children = self.splitter.split_text(p)
+            children = [c for c in raw_children if _is_quality_chunk(c)]
+            if not children:
+                # Fallback: if no child passes quality check, use the parent itself as the child
+                results.append({"child_content": p, "parent_content": p})
+            else:
+                for c in children:
+                    results.append({"child_content": c, "parent_content": p})
+        return results
 
     def create_chunks_with_metadata(
         self, text: str, source_id: str, source_title: str = ""
@@ -105,3 +132,4 @@ class TextSplitter:
             }
             for i, chunk in enumerate(chunks)
         ]
+

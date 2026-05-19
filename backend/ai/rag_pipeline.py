@@ -104,9 +104,13 @@ class RAGEngine:
         chunk_data = []
         for c in chunks:
             if isinstance(c, str):
-                chunk_data.append({"content": c, "url": source_url})
+                chunk_data.append({"content": c, "url": source_url, "parent_content": c})
             else:
-                chunk_data.append({"content": c.get("content", ""), "url": c.get("url", source_url)})
+                chunk_data.append({
+                    "content": c.get("content", ""),
+                    "url": c.get("url", source_url),
+                    "parent_content": c.get("parent_content", c.get("content", ""))
+                })
 
         # Clean chunks inline before embedding
         clean_chunks = []
@@ -114,12 +118,14 @@ class RAGEngine:
         import hashlib
         for i, item in enumerate(chunk_data):
             cleaned = _clean_chunk(item["content"])
+            cleaned_parent = _clean_chunk(item["parent_content"])
             if len(cleaned) >= 50:
                 clean_chunks.append(cleaned)
                 clean_metadatas.append({
                     "source_id": source_id,
                     "source_title": source_title,
                     "source_url": item["url"],
+                    "parent_content": cleaned_parent,
                     "chunk_index": i,
                 })
 
@@ -301,11 +307,13 @@ class RAGEngine:
     # ------------------------------------------------------------------
 
     def _build_context(self, docs: list[dict[str, Any]]) -> str:
-        """Concatenate doc contents for the LLM context window."""
+        """Concatenate doc contents for the LLM context window using Parent-Child strategy."""
         parts = []
         for i, doc in enumerate(docs, 1):
             title = doc.get("metadata", {}).get("source_title", "Document")
-            parts.append(f"[Source {i}: {title}]\n{doc.get('content', '')}")
+            # Retrieve parent chunk if available (Parent-Child Strategy), else fallback to child chunk
+            content = doc.get("metadata", {}).get("parent_content", doc.get("content", ""))
+            parts.append(f"[Source {i}: {title}]\n{content}")
         return "\n\n---\n\n".join(parts)
 
     def _build_answer_prompt(self, query: str, context: str) -> str:
