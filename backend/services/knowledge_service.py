@@ -113,12 +113,25 @@ class KnowledgeService:
 
                 # Mark as processing.
                 source.status = "processing"
+                source.pages_crawled = 0
                 await db.commit()
+
+                # Define progress callback to update crawled pages count in database
+                async def update_progress(count: int) -> None:
+                    async with async_session_factory() as progress_db:
+                        src = await progress_db.get(KnowledgeSource, source_id)
+                        if src:
+                            src.pages_crawled = count
+                            await progress_db.commit()
 
                 # 1. Fetch content.
                 logger.info("Fetching content from %s", source.url)
                 if getattr(source, "source_type", None) == "web_page":
-                    pages = await self.scraper.crawl_website(source.url, max_pages=getattr(source, "max_pages", 200))
+                    pages = await self.scraper.crawl_website(
+                        source.url,
+                        max_pages=getattr(source, "max_pages", 200),
+                        on_page_crawled=update_progress
+                    )
                 else:
                     content = await self.scraper.fetch_content(source.url)
                     # Must be a list of dicts for clean_and_filter_pages

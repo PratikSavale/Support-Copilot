@@ -12,6 +12,7 @@ def test_websocket_chat():
 
     
     mock_chat_service = MagicMock()
+    mock_chat_service.get_session = AsyncMock(return_value=None)
     
     class MockAsyncIterator:
         def __init__(self, items):
@@ -35,9 +36,14 @@ def test_websocket_chat():
         }
     ])
     
-    with patch("api.v1.ws.websocket.get_chat_service", return_value=mock_chat_service):
+    mock_user = MagicMock()
+    mock_user.id = 1
+    mock_user.email = "test@example.com"
+
+    with patch("api.v1.ws.websocket.get_chat_service", return_value=mock_chat_service), \
+         patch("api.v1.ws.websocket._get_user_from_token", return_value=mock_user):
         # Connect to the websocket
-        with client.websocket_connect("/api/v1/chat/ws/test-session-123") as websocket:
+        with client.websocket_connect("/api/v1/chat/ws/test-session-123?token=mock_token") as websocket:
             # Send a message
             websocket.send_text(json.dumps({"type": "message", "content": "Hello"}))
             

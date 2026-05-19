@@ -9,6 +9,8 @@ export interface KnowledgeSource {
   source_type: string
   status: 'pending' | 'processing' | 'indexed' | 'error'
   chunk_count: number
+  pages_crawled?: number
+  max_pages?: number
   last_indexed_at?: string
   created_at: string
 }

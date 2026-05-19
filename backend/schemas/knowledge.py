@@ -36,6 +36,7 @@ class KnowledgeSourceResponse(BaseModel):
     source_type: KnowledgeSourceType
     status: KnowledgeSourceStatus
     chunk_count: int
+    pages_crawled: int = 0
     max_pages: int
     last_indexed_at: datetime | None = None
     created_at: datetime

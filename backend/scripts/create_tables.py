@@ -14,6 +14,7 @@ import models # ensure all models are imported
 async def create_tables():
     async with engine.begin() as conn:
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        await conn.execute(text("ALTER TABLE knowledge_sources ADD COLUMN IF NOT EXISTS pages_crawled INTEGER DEFAULT 0 NOT NULL"))
         await conn.run_sync(Base.metadata.create_all)
     print("Tables created successfully")
 

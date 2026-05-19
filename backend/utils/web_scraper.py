@@ -8,6 +8,7 @@ import asyncio
 import logging
 import re
 from collections import deque
+from typing import Callable, Any
 from urllib.parse import urldefrag, urljoin, urlparse
 
 import httpx
@@ -49,13 +50,20 @@ class WebScraper:
     # Crawling functionality
     # ------------------------------------------------------------------
 
-    async def crawl_website(self, start_url: str, max_pages: int = 200, max_concurrent: int = 20) -> list[str]:
+    async def crawl_website(
+        self,
+        start_url: str,
+        max_pages: int = 200,
+        max_concurrent: int = 20,
+        on_page_crawled: Callable[[int], Any] | None = None,
+    ) -> list[str]:
         """Crawl a website recursively, restricted to the start_url path.
 
         Args:
             start_url: Root URL to start crawling from.
             max_pages: Maximum number of pages to fetch.
             max_concurrent: Maximum concurrent HTTP requests.
+            on_page_crawled: Callback function called when a new page is processed.
 
         Returns:
             List of dicts with {"url": str, "content": str}.
@@ -78,108 +86,164 @@ class WebScraper:
                 
         base_prefix = f"{base_domain}{base_path}"
 
+        queue: asyncio.Queue[str] = asyncio.Queue()
+        await queue.put(start_url)
+        
         visited: set[str] = {start_url}
-        queue: deque[str] = deque([start_url])
-        results: list[str] = []
-        semaphore = asyncio.Semaphore(max_concurrent)
+        results: list[dict[str, str]] = []
+        results_lock = asyncio.Lock()
 
         async def fetch_one(client: httpx.AsyncClient, url: str) -> tuple[str, str, list[str]]:
             """Fetch a single page and extract its text + discovered links."""
-            async with semaphore:
-                html = ""
-                try:
-                    # 1. Try to fetch raw HTML for link extraction (better for framesets/legacy docs)
-                    resp = await client.get(url, headers=self.headers, timeout=10.0)
-                    if resp.status_code == 200:
-                        html = resp.text
-                except Exception as e:
-                    logger.debug("Raw fetch failed for %s: %s", url, e)
+            html = ""
+            try:
+                # 1. Fetch raw HTML
+                resp = await client.get(url, headers=self.headers, timeout=10.0)
+                if resp.status_code == 200:
+                    html = resp.text
+            except Exception as e:
+                logger.debug("Raw fetch failed for %s: %s", url, e)
 
-                text = ""
+            text = ""
+            if html:
+                text = self._parse_html(html)
+
+            # Check if local HTML parsing was clean, high-quality, and sufficient.
+            # We bypass Jina AI Reader completely if local parsing succeeds with good prose.
+            is_static_doc_ok = text and len(text) >= 150 and self._is_quality_page(text)
+            is_storybook = "path=/docs" in url or "iframe.html" in url
+
+            if not is_static_doc_ok or is_storybook:
                 try:
-                    # 2. Fetch via Jina AI Reader (handles JS/SPAs and returns clean Markdown)
+                    logger.info("Falling back to Jina Reader for %s (local content len: %d)", url, len(text))
                     jina_resp = await client.get(f"https://r.jina.ai/{url}", headers=self.headers)
-                    jina_resp.raise_for_status()
-                    text = jina_resp.text
+                    if jina_resp.status_code == 200 and jina_resp.text:
+                        jina_text = jina_resp.text
+                        if len(jina_text) > len(text):
+                            text = jina_text
                 except Exception as exc:
-                    logger.warning("Failed to fetch %s via Jina: %s", url, exc)
-                    # Fallback to raw HTML parsing if Jina fails
-                    if html:
-                        logger.info("Falling back to local HTML parsing for %s", url)
-                        text = self._parse_html(html)
-                    
-                if not text:
-                    return "", "", []
-
-                new_urls: list[str] = []
+                    logger.warning("Failed to fetch %s via Jina fallback: %s", url, exc)
+                    # Use local parsed text as fallback if Jina fails
                 
-                # --- extract links from raw HTML (for JavaDocs/framesets) ---
-                if html:
-                    soup = BeautifulSoup(html, "html.parser")
-                    for tag in soup.find_all(["a", "frame", "iframe"]):
-                        href = tag.get("href") or tag.get("src")
-                        if href:
-                            abs_url = urljoin(url, href)
-                            abs_url, _ = urldefrag(abs_url)
-                            # Normalize URL to prevent infinite loops (e.g. from session IDs)
-                            if '?' in abs_url and 'path=/docs' not in abs_url:
-                                abs_url = abs_url.split('?')[0]
-                            if abs_url.startswith(base_prefix):
-                                new_urls.append(abs_url)
+            if not text:
+                return "", "", []
 
-                # --- extract links from Jina Markdown (for React/JS SPAs) ---
-                for match in re.finditer(r'\]\((https?://[^\s\)]+)\)', text):
-                    abs_url = match.group(1)
-                    abs_url, _ = urldefrag(abs_url)
-                    if '?' in abs_url and 'path=/docs' not in abs_url:
-                        abs_url = abs_url.split('?')[0]
-                    if abs_url.startswith(base_prefix):
-                        new_urls.append(abs_url)
-                    elif abs_url.startswith(base_domain):
-                        # Optional: could add some logic here if we want to follow domain but not path
-                        pass
+            new_urls: list[str] = []
+            
+            # --- extract links from raw HTML (for JavaDocs/framesets) ---
+            if html:
+                soup = BeautifulSoup(html, "html.parser")
+                for tag in soup.find_all(["a", "frame", "iframe"]):
+                    href = tag.get("href") or tag.get("src")
+                    if href:
+                        abs_url = urljoin(url, href)
+                        abs_url, _ = urldefrag(abs_url)
+                        # Normalize URL to prevent infinite loops (e.g. from session IDs)
+                        if '?' in abs_url and 'path=/docs' not in abs_url:
+                            abs_url = abs_url.split('?')[0]
+                        if abs_url.startswith(base_prefix):
+                            new_urls.append(abs_url)
 
-                # --- Storybook SPA Heuristic ---
-                # Storybook loads its actual content inside an iframe.
-                storybook_match = re.search(r'\?path=/docs/(.*?)$', url)
-                if storybook_match:
-                    try:
-                        story_id = storybook_match.group(1).replace('--docs', '').replace('&viewMode=docs', '')
-                        iframe_url = urljoin(url, f"/iframe.html?id={story_id}&viewMode=docs")
-                        logger.info("Detected Storybook URL. Fetching iframe content: %s", iframe_url)
-                        iframe_resp = await client.get(f"https://r.jina.ai/{iframe_url}", headers=self.headers)
-                        if iframe_resp.status_code == 200 and iframe_resp.text:
-                            text += "\n\n" + iframe_resp.text
-                    except Exception as e:
-                        logger.warning("Failed to fetch Storybook iframe for %s: %s", url, e)
+            # --- extract links from Jina Markdown / text content ---
+            for match in re.finditer(r'\]\((https?://[^\s\)]+)\)', text):
+                abs_url = match.group(1)
+                abs_url, _ = urldefrag(abs_url)
+                if '?' in abs_url and 'path=/docs' not in abs_url:
+                    abs_url = abs_url.split('?')[0]
+                if abs_url.startswith(base_prefix):
+                    new_urls.append(abs_url)
 
-                # Small delay per request to be polite to the server.
-                await asyncio.sleep(0.1)
+            # --- Storybook SPA Heuristic ---
+            storybook_match = re.search(r'\?path=/docs/(.*?)$', url)
+            if storybook_match:
+                try:
+                    story_id = storybook_match.group(1).replace('--docs', '').replace('&viewMode=docs', '')
+                    iframe_url = urljoin(url, f"/iframe.html?id={story_id}&viewMode=docs")
+                    logger.info("Detected Storybook URL. Fetching iframe content: %s", iframe_url)
+                    iframe_resp = await client.get(f"https://r.jina.ai/{iframe_url}", headers=self.headers)
+                    if iframe_resp.status_code == 200 and iframe_resp.text:
+                        text += "\n\n" + iframe_resp.text
+                except Exception as e:
+                    logger.warning("Failed to fetch Storybook iframe for %s: %s", url, e)
 
-                return url, text, new_urls
+            # Small delay per request to be polite to the server.
+            await asyncio.sleep(0.1)
+
+            return url, text, new_urls
+
+        async def worker(client: httpx.AsyncClient) -> None:
+            """Independent worker pulling and processing pages from queue."""
+            while True:
+                try:
+                    url = await queue.get()
+                except asyncio.CancelledError:
+                    break
+
+                try:
+                    async with results_lock:
+                        if len(results) >= max_pages:
+                            queue.task_done()
+                            continue
+
+                    fetched_url, text, new_urls = await fetch_one(client, url)
+
+                    if text and len(text) >= 100 and self._is_quality_page(text):
+                        async with results_lock:
+                            if len(results) < max_pages:
+                                results.append({"url": fetched_url, "content": text})
+                                count = len(results)
+                                if count > 0 and count % 20 == 0:
+                                    logger.info("Crawl progress: %d pages collected, %d in queue", count, queue.qsize())
+                                
+                                # Call the progress callback if registered
+                                if on_page_crawled:
+                                    try:
+                                        if asyncio.iscoroutinefunction(on_page_crawled):
+                                            await on_page_crawled(count)
+                                        else:
+                                            on_page_crawled(count)
+                                    except Exception as cb_err:
+                                        logger.debug("Progress callback error: %s", cb_err)
+
+                    for u in new_urls:
+                        async with results_lock:
+                            if u not in visited and len(visited) < max_pages:
+                                visited.add(u)
+                                await queue.put(u)
+                except Exception as e:
+                    logger.debug("Error in crawl worker for %s: %s", url, e)
+                finally:
+                    queue.task_done()
 
         logger.info("Starting crawl of %s (scope_prefix=%s, max_pages=%d)", start_url, scope_prefix, max_pages)
 
         async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
-            while queue and len(results) < max_pages:
-                # Process in batches of max_concurrent
-                current_batch = []
-                while queue and len(current_batch) < max_concurrent:
-                    current_batch.append(queue.popleft())
+            num_workers = min(max_concurrent, max_pages)
+            workers = [asyncio.create_task(worker(client)) for _ in range(num_workers)]
 
-                tasks = [fetch_one(client, u) for u in current_batch]
-                batch_results = await asyncio.gather(*tasks)
+            async def wait_completion() -> None:
+                await queue.join()
 
-                for url, text, new_urls in batch_results:
-                    if text and len(text) >= 100 and self._is_quality_page(text):
-                        results.append({"url": url, "content": text})
-                    for u in new_urls:
-                        if u not in visited and len(visited) < max_pages:
-                            visited.add(u)
-                            queue.append(u)
+            async def monitor() -> None:
+                while True:
+                    async with results_lock:
+                        if len(results) >= max_pages:
+                            break
+                    await asyncio.sleep(0.2)
 
-                if len(results) > 0 and len(results) % 20 == 0:
-                    logger.info("Crawl progress: %d pages collected, %d in queue", len(results), len(queue))
+            # Wait until either the queue is fully processed or we reach max_pages
+            done, pending = await asyncio.wait(
+                [asyncio.create_task(wait_completion()), asyncio.create_task(monitor())],
+                return_when=asyncio.FIRST_COMPLETED
+            )
+
+            for task in pending:
+                task.cancel()
+
+            for w in workers:
+                w.cancel()
+
+            await asyncio.gather(*workers, return_exceptions=True)
 
         logger.info("Crawl finished: %d pages collected from %s", len(results), start_url)
         return results

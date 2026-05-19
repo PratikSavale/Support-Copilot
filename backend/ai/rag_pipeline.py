@@ -354,6 +354,7 @@ class RAGEngine:
                 "sources": [],
                 "action": "escalated",
                 "retrieval_score": 0.0,
+                "retrieved_chunks": [],
             }
         avg_similarity = sum(d["similarity"] for d in context_docs) / len(context_docs)
         response, sources = await self.generate_response(query, context_docs)
@@ -363,6 +364,7 @@ class RAGEngine:
             "sources": sources,
             "action": "resolve" if response != "INSUFFICIENT_DOCUMENTATION" else "escalated",
             "retrieval_score": round(avg_similarity, 4),
+            "retrieved_chunks": context_docs,
         }
 
 

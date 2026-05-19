@@ -38,6 +38,8 @@ async def add_knowledge_source(
         source_type=body.source_type.value if hasattr(body.source_type, "value") else body.source_type,
         max_pages=body.max_pages,
     )
+    # Commit request transaction so background task sees the record immediately
+    await db.commit()
     # Kick off ingestion in the background.
     background_tasks.add_task(knowledge_service.ingest_source, str(source.id))
     return KnowledgeSourceCreateAccepted(source_id=source.id, status=source.status)
@@ -95,8 +97,7 @@ async def reindex_knowledge_source(
         )
     # Mark as processing immediately.
     source.status = "processing"
-    await db.flush()
-    await db.refresh(source)
+    await db.commit()
 
     background_tasks.add_task(knowledge_service.reindex_source, str(source_id))
     return KnowledgeSourceResponse.model_validate(source)

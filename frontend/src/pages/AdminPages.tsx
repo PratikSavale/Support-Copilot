@@ -406,6 +406,35 @@ const SourceList = () => {
                     Type: {source.source_type}
                   </span>
                 </div>
+
+                {source.status === 'processing' && (
+                  <div className="mt-3 space-y-1.5 min-w-[250px] max-w-md">
+                    <div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-widest text-[#0f62fe]">
+                      <span className="flex items-center gap-1.5">
+                        <Loader2 className="w-3 h-3 animate-spin text-[#0f62fe]" />
+                        Crawling & Ingesting Pages...
+                      </span>
+                      <span>{source.pages_crawled || 0} / {source.max_pages || 200}</span>
+                    </div>
+                    <div className="h-1 w-full bg-[#161616] border border-[#393939] rounded-full overflow-hidden">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${Math.min(100, (((source.pages_crawled || 0)) / (source.max_pages || 200)) * 100)}%` }}
+                        transition={{ duration: 0.5, ease: "easeOut" }}
+                        className="h-full bg-gradient-to-r from-[#0f62fe] to-[#8a3ffc] rounded-full shadow-[0_0_8px_rgba(15,98,254,0.5)]"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {source.status === 'pending' && (
+                  <div className="mt-3 space-y-1.5 min-w-[250px] max-w-md">
+                    <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-[#8d8d8d]">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      Queueing for Ingestion...
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
