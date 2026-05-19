@@ -23,6 +23,7 @@ class Action(str, Enum):
     clarification = "clarification"
     escalated = "escalated"
     searching = "searching"
+    failed = "failed"
 
 
 class SourceInfo(BaseModel):

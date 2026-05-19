@@ -34,7 +34,7 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
   const navigate = useNavigate()
   const { sendMessage } = useWebSocket(sessionId || null)
   const [activePanelIdx, setActivePanelIdx] = useState<number | null>(null)
-  const { messages } = useUserStore()
+  const { messages, fetchSessionHistory } = useUserStore()
 
   // Feedback & Escalation states
   const [feedback, setFeedback] = useState<'none' | 'liked' | 'disliked'>('none')
@@ -80,6 +80,7 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
     try {
       const response = await api.post('/tickets/escalate', { session_id: sessionId })
       setEscalationResult(response.data)
+      await fetchSessionHistory(sessionId)
     } catch (err) {
       console.error('Failed to escalate session:', err)
     } finally {
@@ -205,7 +206,7 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
           )}
 
           {/* Inline Escalated Ticket Card (if manually escalated just now) */}
-          {escalationResult && (
+          {escalationResult && !isEscalated && (
             <div className="mt-3 pt-3 border-t border-[#e0e0e0]">
               <div className="flex flex-col gap-2 px-3 py-2.5 rounded-md bg-[#fff1f1] border border-[#da1e28]/20 group cursor-pointer hover:bg-[#fff1f1]/80 transition-colors"
                 onClick={() => {

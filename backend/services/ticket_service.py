@@ -121,6 +121,16 @@ class TicketService:
         session = await db.get(Session, session_id)
         if session:
             session.status = "escalated"
+            
+            # Find the latest assistant message and mark its action as escalated
+            await db.refresh(session, ["messages"])
+            if session.messages:
+                for m in reversed(session.messages):
+                    role_str = m.role.value if hasattr(m.role, "value") else str(m.role)
+                    if role_str == "assistant":
+                        m.action = "escalated"
+                        db.add(m)
+                        break
 
         return ticket
 
