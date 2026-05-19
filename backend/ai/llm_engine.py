@@ -134,6 +134,86 @@ class LLMEngine:
         retry=retry_if_exception_type(Exception),
         reraise=True,
     )
+    async def generate_multimodal_response(
+        self,
+        prompt: str,
+        mime_type: str,
+        file_bytes: bytes,
+        response_schema: Any | None = None
+    ) -> dict[str, Any] | str:
+        """Generate a response using a multimodal file input in an LLM-agnostic way.
+
+        Encodes the file as a base64 string and sends it as inline content in a standard
+        LangChain HumanMessage, optionally using structured outputs.
+        """
+        import base64
+        import logging
+        from langchain_core.messages import HumanMessage
+
+        logger = logging.getLogger(__name__)
+        encoded_data = base64.b64encode(file_bytes).decode("utf-8")
+        
+        # Build standard multimodal message block
+        if mime_type.startswith("image/"):
+            content_block = {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:{mime_type};base64,{encoded_data}"
+                }
+            }
+        else:
+            if "google" in str(self.model.__class__).lower():
+                content_block = {
+                    "type": "media",
+                    "mime_type": mime_type,
+                    "data": encoded_data
+                }
+            else:
+                content_block = {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:{mime_type};base64,{encoded_data}"
+                    }
+                }
+        
+        message = HumanMessage(
+            content=[
+                {"type": "text", "text": prompt},
+                content_block
+            ]
+        )
+        
+        try:
+            if response_schema:
+                structured_model = self.model.with_structured_output(response_schema)
+                res = await structured_model.ainvoke([message])
+                if hasattr(res, "model_dump"):
+                    return res.model_dump()
+                elif isinstance(res, dict):
+                    return res
+                return str(res)
+            
+            response = await self.model.ainvoke([message])
+            content = response.content
+            if isinstance(content, list):
+                text_parts = []
+                for part in content:
+                    if isinstance(part, str):
+                        text_parts.append(part)
+                    elif isinstance(part, dict) and part.get("type") == "text":
+                        text_parts.append(part.get("text", ""))
+                return "".join(text_parts)
+            return str(content)
+        except Exception as e:
+            logger.error("LLMEngine Error in generate_multimodal_response: %s", e, exc_info=True)
+            raise e
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(min=2, max=10),
+        retry=retry_if_exception_type(Exception),
+        reraise=True,
+    )
     async def evaluate_relevance(self, query: str, context: str) -> float:
         prompt = (
             "Evaluate how relevant the context is to the query.\n"

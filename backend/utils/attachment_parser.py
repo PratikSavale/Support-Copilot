@@ -11,11 +11,11 @@ import asyncio
 import json
 import logging
 import re
-import tempfile
-import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
+
+from pydantic import BaseModel, Field
 
 from config.settings import get_settings
 
@@ -57,11 +57,21 @@ class ParsedAttachment:
         }
 
 
+class AttachmentSummarySchema(BaseModel):
+    detected_error: str | None = Field(None, description="Any visible error messages, exception tracebacks, status codes, or failure details.")
+    screen_or_area: str | None = Field(None, description="The name of the screen, webpage URL, module, or UI area shown.")
+    visible_steps: list[str] = Field(default_factory=list, description="A step-by-step sequence of user actions or visual steps leading to the error.")
+    important_evidence: list[str] = Field(default_factory=list, description="Crucial visual evidence, request IDs, logs, metrics, or timestamps shown.")
+    issue_summary: str = Field(..., description="A detailed natural language summary of the issue shown in the attachment.")
+
+
 class AttachmentParser:
     """Parse uploaded support evidence into a concise issue summary."""
 
     def __init__(self) -> None:
         self.settings = get_settings()
+        from ai.llm_engine import get_llm_engine
+        self.llm_engine = get_llm_engine()
 
     async def parse(
         self,
@@ -129,6 +139,7 @@ class AttachmentParser:
                 "Install pypdf from requirements.txt to extract PDF content."
             )
 
+        import tempfile
         with tempfile.NamedTemporaryFile(suffix=".pdf", delete=True) as tmp:
             tmp.write(data)
             tmp.flush()
@@ -158,9 +169,18 @@ class AttachmentParser:
         heuristic = self._heuristic_text_summary(cleaned)
 
         if self.settings.GEMINI_API_KEY and cleaned:
-            llm_result = await self._gemini_text_summary(cleaned)
-            if llm_result:
-                heuristic.update({k: v for k, v in llm_result.items() if v})
+            prompt = self._summary_prompt() + "\n\nAttachment text:\n" + cleaned[:TEXT_PREVIEW_LIMIT]
+            try:
+                llm_result = await self.llm_engine.generate_multimodal_response(
+                    prompt=prompt,
+                    mime_type="text/plain",
+                    file_bytes=cleaned.encode("utf-8"),
+                    response_schema=AttachmentSummarySchema
+                )
+                if isinstance(llm_result, dict):
+                    heuristic.update({k: v for k, v in llm_result.items() if v})
+            except Exception as exc:
+                logger.warning("LLM text attachment parsing failed: %s", exc)
 
         summary = self._build_issue_summary(
             file_name=file_name,
@@ -213,14 +233,18 @@ class AttachmentParser:
                 warnings=["Visual parsing is disabled because GEMINI_API_KEY is not configured."],
             )
 
-        parsed = await asyncio.to_thread(
-            self._gemini_multimodal_summary,
-            file_name,
-            mime_type,
-            attachment_type,
-            data,
-        )
-        if parsed:
+        try:
+            parsed = await self.llm_engine.generate_multimodal_response(
+                prompt=self._summary_prompt(),
+                mime_type=mime_type,
+                file_bytes=data,
+                response_schema=AttachmentSummarySchema
+            )
+        except Exception as exc:
+            logger.warning("LLM multimodal attachment parsing failed: %s", exc)
+            parsed = None
+
+        if parsed and isinstance(parsed, dict):
             summary = self._build_issue_summary(
                 file_name=file_name,
                 attachment_type=attachment_type,
@@ -254,71 +278,11 @@ class AttachmentParser:
             warnings=["Automatic visual parsing failed."],
         )
 
-    async def _gemini_text_summary(self, text: str) -> dict[str, Any]:
-        try:
-            import google.generativeai as genai
-
-            genai.configure(api_key=self.settings.GEMINI_API_KEY)
-            model = genai.GenerativeModel(self.settings.GEMINI_MODEL)
-            prompt = self._summary_prompt() + "\n\nAttachment text:\n" + text[:TEXT_PREVIEW_LIMIT]
-            response = await asyncio.to_thread(model.generate_content, prompt)
-            return self._parse_json_response(getattr(response, "text", ""))
-        except Exception as exc:
-            logger.warning("Gemini text attachment parsing failed: %s", exc)
-            return {}
-
-    def _gemini_multimodal_summary(
-        self,
-        file_name: str,
-        mime_type: str,
-        attachment_type: str,
-        data: bytes,
-    ) -> dict[str, Any]:
-        try:
-            import google.generativeai as genai
-
-            genai.configure(api_key=self.settings.GEMINI_API_KEY)
-            model = genai.GenerativeModel(self.settings.GEMINI_MODEL)
-            prompt = self._summary_prompt()
-
-            if attachment_type == "image":
-                response = model.generate_content(
-                    [prompt, {"mime_type": mime_type, "data": data}]
-                )
-                return self._parse_json_response(getattr(response, "text", ""))
-
-            suffix = Path(file_name).suffix or ".mp4"
-            with tempfile.NamedTemporaryFile(suffix=suffix, delete=True) as tmp:
-                tmp.write(data)
-                tmp.flush()
-                uploaded = genai.upload_file(path=tmp.name, mime_type=mime_type)
-                uploaded = self._wait_for_uploaded_file(genai, uploaded)
-                response = model.generate_content([prompt, uploaded])
-                return self._parse_json_response(getattr(response, "text", ""))
-        except Exception as exc:
-            logger.warning("Gemini multimodal attachment parsing failed: %s", exc)
-            return {}
-
-    def _wait_for_uploaded_file(self, genai: Any, uploaded: Any) -> Any:
-        """Wait briefly for Gemini file processing, mainly needed for videos."""
-        name = getattr(uploaded, "name", None)
-        if not name:
-            return uploaded
-
-        for _ in range(12):
-            current = genai.get_file(name)
-            state = getattr(getattr(current, "state", None), "name", "")
-            if state and state != "PROCESSING":
-                return current
-            time.sleep(2)
-        return uploaded
-
     def _summary_prompt(self) -> str:
         return (
             "You are extracting evidence from a customer support attachment. "
             "Do not solve the issue and do not use external product knowledge. "
-            "Return valid JSON only with fields: detected_error, screen_or_area, "
-            "visible_steps as an array, important_evidence as an array, issue_summary. "
+            "Extract visual and textual content from this attachment. "
             "Focus on visible errors, page/screen names, user actions, logs, timestamps, "
             "request IDs, and anything useful for searching trusted documentation."
         )
@@ -382,12 +346,3 @@ class AttachmentParser:
         text = re.sub(r"[ \t]+", " ", text)
         text = re.sub(r"\n{4,}", "\n\n", text)
         return text.strip()
-
-    def _parse_json_response(self, raw: str) -> dict[str, Any]:
-        cleaned = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
-        try:
-            parsed = json.loads(cleaned)
-            return parsed if isinstance(parsed, dict) else {}
-        except json.JSONDecodeError:
-            logger.warning("Attachment parser received non-JSON model output: %s", raw[:200])
-            return {}
