@@ -285,12 +285,10 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
             const StatusIcon = sc.icon
             return (
             <div className="mt-3 pt-3 border-t border-[#e0e0e0] dark:border-slate-800">
-              <div className={`flex flex-col gap-2 px-3 py-2.5 rounded-md border group cursor-pointer transition-colors ${sc.cardBg} ${sc.cardBorder} ${sc.cardHover}`}
+              <div className={`flex flex-col gap-2 px-3 py-2.5 rounded-md border group transition-colors ${sc.cardBg} ${sc.cardBorder} ${escalationResult.ticket?.jira_url ? `${sc.cardHover} cursor-pointer` : ''}`}
                 onClick={() => {
                   if (escalationResult.ticket?.jira_url) {
                     window.open(escalationResult.ticket.jira_url, '_blank', 'noopener,noreferrer')
-                  } else {
-                    navigate('/tickets')
                   }
                 }}
               >
@@ -307,9 +305,11 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
                     <span className={`text-[9px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${sc.badgeText} ${sc.badgeBg}`}>
                       {sc.label}
                     </span>
-                    <div className={sc.linkColor}>
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </div>
+                    {escalationResult.ticket?.jira_url && (
+                      <div className={sc.linkColor}>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </div>
+                    )}
                   </div>
                 </div>
                 
@@ -356,12 +356,10 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
             const StatusIcon = sc.icon
             return (
             <div className="mt-3 pt-3 border-t border-[#e0e0e0] dark:border-slate-800">
-              <div className={`flex flex-col gap-2 px-3 py-2.5 rounded-md border group cursor-pointer transition-colors ${sc.cardBg} ${sc.cardBorder} ${sc.cardHover}`}
+              <div className={`flex flex-col gap-2 px-3 py-2.5 rounded-md border group transition-colors ${sc.cardBg} ${sc.cardBorder} ${message.ticket?.jira_url ? `${sc.cardHover} cursor-pointer` : ''}`}
                 onClick={() => {
                   if (message.ticket?.jira_url) {
                     window.open(message.ticket.jira_url, '_blank', 'noopener,noreferrer')
-                  } else {
-                    navigate('/tickets')
                   }
                 }}
               >
@@ -378,9 +376,11 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
                     <span className={`text-[9px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${sc.badgeText} ${sc.badgeBg}`}>
                       {sc.label}
                     </span>
-                    <div className={`${sc.linkColor} hover:opacity-80 transition-colors`}>
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </div>
+                    {message.ticket?.jira_url && (
+                      <div className={`${sc.linkColor} hover:opacity-80 transition-colors`}>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </div>
+                    )}
                   </div>
                 </div>
                 

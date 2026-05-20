@@ -5,13 +5,13 @@ import { MessageInput } from '../components/MessageInput'
 import { useUserStore } from '../store/userStore'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Sparkles, MessageSquare, AlertTriangle, RefreshCcw } from 'lucide-react'
+import { Sparkles, MessageSquare, AlertTriangle, RefreshCcw, Loader2 } from 'lucide-react'
 
 
 export const ChatPage = () => {
   const { sessionId } = useParams<{ sessionId: string }>()
   const navigate = useNavigate()
-  const { messages, setSessionId, isStreaming, clearMessages, isConnected, fetchSessionHistory } = useUserStore()
+  const { messages, setSessionId, isStreaming, clearMessages, isConnected, fetchSessionHistory, isHistoryLoading } = useUserStore()
   const { sendMessage, stopQuery } = useWebSocket(sessionId || null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -27,9 +27,10 @@ export const ChatPage = () => {
       navigate(`/chat/${newId}`, { replace: true })
       return
     }
+    clearMessages()
     setSessionId(sessionId)
     fetchSessionHistory(sessionId)
-  }, [sessionId, setSessionId, navigate, fetchSessionHistory])
+  }, [sessionId, setSessionId, navigate, fetchSessionHistory, clearMessages])
 
   // Auto-scroll
   useEffect(() => {
@@ -65,11 +66,24 @@ export const ChatPage = () => {
           ref={scrollRef}
           className="flex-1 overflow-y-auto pr-4 scroll-smooth"
         >
-          <AnimatePresence initial={false}>
-            {messages.length === 0 ? (
+          <AnimatePresence initial={false} mode="wait">
+            {isHistoryLoading ? (
               <motion.div 
+                key="loading"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="h-full flex flex-col items-center justify-center text-center"
+              >
+                <Loader2 className="w-8 h-8 text-[#0f62fe] animate-spin mb-4" />
+                <p className="text-sm text-[#525252] dark:text-slate-400">Loading conversation...</p>
+              </motion.div>
+            ) : messages.length === 0 ? (
+              <motion.div 
+                key="welcome"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
                 className="h-full flex flex-col items-center justify-center text-center px-6"
               >
                 <div className="w-16 h-16 rounded-2xl bg-[#ffffff] dark:bg-slate-900 border border-[#e0e0e0] dark:border-slate-800 flex items-center justify-center mb-6 shadow-sm">
@@ -99,11 +113,17 @@ export const ChatPage = () => {
                 </div>
               </motion.div>
             ) : (
-              <div className="flex flex-col">
+              <motion.div 
+                key="messages"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex flex-col"
+              >
                 {messages.map((msg) => (
                   <MessageBubble key={msg.id} message={msg} />
                 ))}
-              </div>
+              </motion.div>
             )}
           </AnimatePresence>
         </div>
