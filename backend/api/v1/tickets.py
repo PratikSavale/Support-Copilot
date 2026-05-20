@@ -53,9 +53,15 @@ async def list_tickets(
     "/{ticket_id}",
     response_model=TicketDetailResponse,
 )
-async def get_ticket(ticket_id: UUID, db: DbSession) -> TicketDetailResponse:
-    """Get a single ticket by ID."""
+async def get_ticket(
+    ticket_id: UUID,
+    db: DbSession,
+    refresh: bool = False,
+) -> TicketDetailResponse:
+    """Get a single ticket by ID, optionally refreshing from Jira."""
     ticket_service = get_ticket_service()
+    if refresh:
+        await ticket_service.sync_ticket_to_jira(db, str(ticket_id))
     ticket = await ticket_service.get_ticket(db, str(ticket_id))
     if not ticket:
         raise HTTPException(
