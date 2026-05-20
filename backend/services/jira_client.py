@@ -320,8 +320,21 @@ class JiraClient:
         headers = self._headers()
 
         payload = {
-            "body": comment,
-            "visibility": {"type": "role", "value": "Users"},  # Visible to all
+            "body": {
+                "type": "doc",
+                "version": 1,
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": comment,
+                            }
+                        ],
+                    }
+                ],
+            },
         }
 
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -330,7 +343,7 @@ class JiraClient:
             data = response.json()
             return {
                 "id": data.get("id"),
-                "body": data.get("body"),
+                "body": comment,
                 "author": data.get("author", {}).get("displayName"),
                 "created": data.get("created"),
             }
