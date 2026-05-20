@@ -10,7 +10,9 @@ import {
   ExternalLink,
   ThumbsUp,
   ThumbsDown,
-  Loader2
+  Loader2,
+  Clock,
+  RefreshCw
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Message } from '../store/userStore'
@@ -26,6 +28,78 @@ import { SourceChips, SourceDetailPanel } from './SourceChipPanel'
 
 interface MessageBubbleProps {
   message: Message
+}
+
+/** Returns status-specific colors, icon, and label for the ticket card. */
+const getStatusConfig = (status?: string) => {
+  const s = (status || '').toLowerCase().replace(/\s+/g, '_')
+  switch (s) {
+    case 'open':
+      return {
+        label: 'Open',
+        icon: AlertCircle,
+        badgeText: 'text-amber-600 dark:text-amber-400',
+        badgeBg: 'bg-amber-500/10 dark:bg-amber-500/15',
+        cardBg: 'bg-amber-50 dark:bg-amber-950/20',
+        cardBorder: 'border-amber-400/25 dark:border-amber-800/40',
+        cardHover: 'hover:bg-amber-50/80 dark:hover:bg-amber-950/30',
+        iconColor: 'text-amber-500 dark:text-amber-400',
+        titleColor: 'text-amber-900 dark:text-amber-100',
+        linkColor: 'text-amber-600 dark:text-amber-400',
+      }
+    case 'in_progress':
+      return {
+        label: 'In Progress',
+        icon: RefreshCw,
+        badgeText: 'text-blue-600 dark:text-blue-400',
+        badgeBg: 'bg-blue-500/10 dark:bg-blue-500/15',
+        cardBg: 'bg-blue-50 dark:bg-blue-950/20',
+        cardBorder: 'border-blue-400/25 dark:border-blue-800/40',
+        cardHover: 'hover:bg-blue-50/80 dark:hover:bg-blue-950/30',
+        iconColor: 'text-blue-500 dark:text-blue-400',
+        titleColor: 'text-blue-900 dark:text-blue-100',
+        linkColor: 'text-blue-600 dark:text-blue-400',
+      }
+    case 'resolved':
+      return {
+        label: 'Resolved',
+        icon: CheckCircle2,
+        badgeText: 'text-emerald-600 dark:text-emerald-400',
+        badgeBg: 'bg-emerald-500/10 dark:bg-emerald-500/15',
+        cardBg: 'bg-emerald-50 dark:bg-emerald-950/20',
+        cardBorder: 'border-emerald-400/25 dark:border-emerald-800/40',
+        cardHover: 'hover:bg-emerald-50/80 dark:hover:bg-emerald-950/30',
+        iconColor: 'text-emerald-500 dark:text-emerald-400',
+        titleColor: 'text-emerald-900 dark:text-emerald-100',
+        linkColor: 'text-emerald-600 dark:text-emerald-400',
+      }
+    case 'closed':
+      return {
+        label: 'Closed',
+        icon: CheckCircle2,
+        badgeText: 'text-slate-500 dark:text-slate-400',
+        badgeBg: 'bg-slate-500/10 dark:bg-slate-500/15',
+        cardBg: 'bg-slate-50 dark:bg-slate-800/30',
+        cardBorder: 'border-slate-300/40 dark:border-slate-700/40',
+        cardHover: 'hover:bg-slate-100/80 dark:hover:bg-slate-800/40',
+        iconColor: 'text-slate-400 dark:text-slate-500',
+        titleColor: 'text-slate-700 dark:text-slate-300',
+        linkColor: 'text-slate-500 dark:text-slate-400',
+      }
+    default:
+      return {
+        label: status || 'In Review',
+        icon: Clock,
+        badgeText: 'text-violet-600 dark:text-violet-400',
+        badgeBg: 'bg-violet-500/10 dark:bg-violet-500/15',
+        cardBg: 'bg-violet-50 dark:bg-violet-950/20',
+        cardBorder: 'border-violet-400/25 dark:border-violet-800/40',
+        cardHover: 'hover:bg-violet-50/80 dark:hover:bg-violet-950/30',
+        iconColor: 'text-violet-500 dark:text-violet-400',
+        titleColor: 'text-violet-900 dark:text-violet-100',
+        linkColor: 'text-violet-600 dark:text-violet-400',
+      }
+  }
 }
 
 export const MessageBubble = ({ message }: MessageBubbleProps) => {
@@ -206,9 +280,12 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
           )}
 
           {/* Inline Escalated Ticket Card (if manually escalated just now) */}
-          {escalationResult && !isEscalated && (
+          {escalationResult && !isEscalated && (() => {
+            const sc = getStatusConfig(escalationResult.ticket?.status)
+            const StatusIcon = sc.icon
+            return (
             <div className="mt-3 pt-3 border-t border-[#e0e0e0] dark:border-slate-800">
-              <div className="flex flex-col gap-2 px-3 py-2.5 rounded-md bg-[#fff1f1] dark:bg-rose-950/20 border border-[#da1e28]/20 dark:border-rose-900/30 group cursor-pointer hover:bg-[#fff1f1]/80 dark:hover:bg-rose-950/30 transition-colors"
+              <div className={`flex flex-col gap-2 px-3 py-2.5 rounded-md border group cursor-pointer transition-colors ${sc.cardBg} ${sc.cardBorder} ${sc.cardHover}`}
                 onClick={() => {
                   if (escalationResult.ticket?.jira_url) {
                     window.open(escalationResult.ticket.jira_url, '_blank', 'noopener,noreferrer')
@@ -219,18 +296,18 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2">
-                    <AlertCircle className="w-3.5 h-3.5 text-[#da1e28] flex-shrink-0" />
+                    <StatusIcon className={`w-3.5 h-3.5 flex-shrink-0 ${sc.iconColor}`} />
                     <div>
-                      <span className="text-[11px] font-semibold text-[#161616] dark:text-rose-100 block">
+                      <span className={`text-[11px] font-semibold block ${sc.titleColor}`}>
                         Jira Ticket Created
                       </span>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-[9px] font-semibold uppercase tracking-wider text-[#da1e28] bg-[#da1e28]/10 px-2 py-0.5 rounded-full">
-                      {escalationResult.ticket?.status || 'In Review'}
+                    <span className={`text-[9px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${sc.badgeText} ${sc.badgeBg}`}>
+                      {sc.label}
                     </span>
-                    <div className="text-[#da1e28]">
+                    <div className={sc.linkColor}>
                       <ExternalLink className="w-3.5 h-3.5" />
                     </div>
                   </div>
@@ -246,7 +323,8 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
                 </div>
               </div>
             </div>
-          )}
+            )
+          })()}
 
           {/* State 1: RAG hit — source chips */}
           {isRagHit && (
@@ -273,9 +351,12 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
           )}
 
           {/* State 3: Escalated ticket — card with ticket ID, no chips */}
-          {isEscalated && (
+          {isEscalated && (() => {
+            const sc = getStatusConfig(message.ticket?.status)
+            const StatusIcon = sc.icon
+            return (
             <div className="mt-3 pt-3 border-t border-[#e0e0e0] dark:border-slate-800">
-              <div className="flex flex-col gap-2 px-3 py-2.5 rounded-md bg-[#fff1f1] dark:bg-rose-950/20 border border-[#da1e28]/20 dark:border-rose-900/30 group cursor-pointer hover:bg-[#fff1f1]/80 dark:hover:bg-rose-950/30 transition-colors"
+              <div className={`flex flex-col gap-2 px-3 py-2.5 rounded-md border group cursor-pointer transition-colors ${sc.cardBg} ${sc.cardBorder} ${sc.cardHover}`}
                 onClick={() => {
                   if (message.ticket?.jira_url) {
                     window.open(message.ticket.jira_url, '_blank', 'noopener,noreferrer')
@@ -286,18 +367,18 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2">
-                    <AlertCircle className="w-3.5 h-3.5 text-[#da1e28] flex-shrink-0" />
+                    <StatusIcon className={`w-3.5 h-3.5 flex-shrink-0 ${sc.iconColor}`} />
                     <div>
-                      <span className="text-[11px] font-semibold text-[#161616] dark:text-rose-100 block">
+                      <span className={`text-[11px] font-semibold block ${sc.titleColor}`}>
                         Ticket created
                       </span>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-[9px] font-semibold uppercase tracking-wider text-[#da1e28] bg-[#da1e28]/10 px-2 py-0.5 rounded-full">
-                      {message.ticket?.status || 'In Review'}
+                    <span className={`text-[9px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${sc.badgeText} ${sc.badgeBg}`}>
+                      {sc.label}
                     </span>
-                    <div className="text-[#da1e28] hover:text-[#da1e28]/80 transition-colors">
+                    <div className={`${sc.linkColor} hover:opacity-80 transition-colors`}>
                       <ExternalLink className="w-3.5 h-3.5" />
                     </div>
                   </div>
@@ -313,7 +394,8 @@ export const MessageBubble = ({ message }: MessageBubbleProps) => {
                 </div>
               </div>
             </div>
-          )}
+            )
+          })()}
           
           <span className="text-[10px] text-[#a8a8a8] dark:text-slate-500 absolute bottom-[-18px] right-2 font-medium">
             {displayTime}
