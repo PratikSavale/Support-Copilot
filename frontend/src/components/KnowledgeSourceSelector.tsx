@@ -35,8 +35,8 @@ export const KnowledgeSourceSelector = () => {
         className={cn(
           "flex items-center gap-2 px-4 py-2 rounded-xl border transition-all text-xs font-bold uppercase tracking-widest",
             selectedSources.length > 0
-              ? "bg-[#0f62fe]/10 border-[#0f62fe]/20 text-[#0f62fe]"
-              : "bg-white border-[#e0e0e0] text-[#525252] hover:bg-[#f4f4f4] hover:text-[#161616] shadow-sm"
+              ? "bg-[#0f62fe]/10 border-[#0f62fe]/20 text-[#0f62fe] dark:text-blue-400"
+              : "bg-white dark:bg-slate-900 border-[#e0e0e0] dark:border-slate-800 text-[#525252] dark:text-slate-300 hover:bg-[#f4f4f4] dark:hover:bg-slate-850 hover:text-[#161616] dark:hover:text-white shadow-sm"
           )}
       >
         <BookOpen className="w-4 h-4" />
@@ -55,11 +55,11 @@ export const KnowledgeSourceSelector = () => {
             animate={{ opacity: 1, y: 0, scale: 1, x: "-50%" }}
             exit={{ opacity: 0, y: 8, scale: 0.95, x: "-50%" }}
             transition={{ duration: 0.15 }}
-            className="absolute top-full mt-3 left-1/2 w-72 bg-white border border-[#e0e0e0] rounded-2xl shadow-xl z-[100] overflow-hidden flex flex-col"
+            className="absolute top-full mt-3 left-1/2 w-72 bg-white dark:bg-slate-900 border border-[#e0e0e0] dark:border-slate-800 rounded-2xl shadow-xl z-[100] overflow-hidden flex flex-col"
           >
-            <div className="px-4 py-3 border-b border-[#e0e0e0] bg-[#f4f4f4]">
-              <h4 className="text-[10px] text-[#525252] font-bold uppercase tracking-widest">Select Context</h4>
-              <p className="text-[10px] text-[#a8a8a8] mt-0.5">Filter answers by source</p>
+            <div className="px-4 py-3 border-b border-[#e0e0e0] dark:border-slate-800 bg-[#f4f4f4] dark:bg-slate-950">
+              <h4 className="text-[10px] text-[#525252] dark:text-slate-400 font-bold uppercase tracking-widest">Select Context</h4>
+              <p className="text-[10px] text-[#a8a8a8] dark:text-slate-500 mt-0.5">Filter answers by source</p>
             </div>
             <div className="max-h-60 overflow-y-auto p-2 flex flex-col gap-1">
               {readySources.map((source) => {
@@ -71,12 +71,12 @@ export const KnowledgeSourceSelector = () => {
                     className={cn(
                       "flex items-center justify-between w-full px-3 py-2.5 rounded-xl text-left transition-all",
                       isSelected
-                        ? "bg-[#0f62fe]/10 text-[#0f62fe]"
-                        : "text-[#525252] hover:bg-[#f4f4f4] hover:text-[#161616]"
+                        ? "bg-[#0f62fe]/10 dark:bg-blue-500/10 text-[#0f62fe] dark:text-blue-400"
+                        : "text-[#525252] dark:text-slate-350 hover:bg-[#f4f4f4] dark:hover:bg-slate-800 hover:text-[#161616] dark:hover:text-white"
                     )}
                   >
                     <div className="flex flex-col min-w-0 pr-2">
-                      <span className="text-sm font-medium truncate">
+                      <span className="text-sm font-medium truncate text-slate-850 dark:text-slate-205">
                         {source.title || source.url.split('/').pop() || source.url}
                       </span>
                     </div>
@@ -84,7 +84,7 @@ export const KnowledgeSourceSelector = () => {
                       "w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-colors",
                       isSelected 
                         ? "bg-[#0f62fe] border-[#0f62fe] text-white" 
-                        : "border-[#c6c6c6]"
+                        : "border-[#c6c6c6] dark:border-slate-700"
                     )}>
                       {isSelected && <Check className="w-3 h-3" />}
                     </div>
@@ -93,14 +93,14 @@ export const KnowledgeSourceSelector = () => {
               })}
             </div>
             {selectedSources.length > 0 && (
-              <div className="p-2 border-t border-[#e0e0e0] bg-[#f4f4f4]">
+              <div className="p-2 border-t border-[#e0e0e0] dark:border-slate-800 bg-[#f4f4f4] dark:bg-slate-950">
                 <button
                   onClick={() => {
                     // Clear all by toggling them off
                     selectedSources.forEach(id => toggleSourceSelection(id))
                     setIsOpen(false)
                   }}
-                  className="w-full py-2 rounded-xl bg-white border border-[#e0e0e0] hover:bg-[#e0e0e0] text-[#525252] hover:text-[#161616] text-xs font-bold uppercase tracking-widest transition-colors shadow-sm"
+                  className="w-full py-2 rounded-xl bg-white dark:bg-slate-900 border border-[#e0e0e0] dark:border-slate-800 hover:bg-[#e0e0e0] dark:hover:bg-slate-850 text-[#525252] dark:text-slate-350 hover:text-[#161616] dark:hover:text-white text-xs font-bold uppercase tracking-widest transition-colors shadow-sm"
                 >
                   Clear Selection
                 </button>

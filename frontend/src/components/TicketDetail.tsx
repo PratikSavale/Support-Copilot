@@ -37,29 +37,29 @@ export const TicketDetail = ({ ticket, onClose }: TicketDetailProps) => {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
-        className="absolute inset-0 bg-[#161616]/80 backdrop-blur-sm"
+        className="absolute inset-0 bg-[#161616]/60 dark:bg-[#161616]/80 backdrop-blur-sm"
       />
 
       <motion.div
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.9, y: 20 }}
-        className="relative w-full max-w-2xl bg-[#262626] border border-[#393939] rounded-3xl overflow-hidden shadow-2xl shadow-black"
+        className="relative w-full max-w-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden shadow-2xl transition-colors duration-300"
       >
         {/* Header */}
-        <div className="px-8 py-6 border-b border-[#393939] flex items-center justify-between bg-[#161616]">
+        <div className="px-8 py-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
           <div className="flex items-center gap-4">
             <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500">
               <ShieldAlert className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-[#f4f4f4]">Chat Details</h3>
-              <p className="text-[10px] text-[#c6c6c6] uppercase tracking-widest font-bold">Ref: {ticket.jira_issue_key || ticket.id.slice(0, 8)}</p>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white">Chat Details</h3>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest font-bold">Ref: {ticket.jira_issue_key || ticket.id.slice(0, 8)}</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl hover:bg-[#393939] text-[#c6c6c6] hover:text-[#f4f4f4] transition-all"
+            className="p-2 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all"
           >
             <X className="w-5 h-5" />
           </button>
@@ -76,45 +76,45 @@ export const TicketDetail = ({ ticket, onClose }: TicketDetailProps) => {
               >
                 {ticket.severity}
               </span>
-              <span className="px-3 py-1 rounded-full bg-[#161616] border border-[#393939] text-[#c6c6c6] text-[10px] font-bold uppercase tracking-wider">
+              <span className="px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 text-slate-600 dark:text-slate-400 text-[10px] font-bold uppercase tracking-wider">
                 {ticket.status}
               </span>
             </div>
-            <h2 className="text-2xl font-bold text-[#f4f4f4] leading-tight">{ticket.summary}</h2>
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white leading-tight">{ticket.summary}</h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <label className="text-[10px] uppercase tracking-widest font-bold text-[#c6c6c6] flex items-center gap-2">
+              <label className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 flex items-center gap-2">
                 <Calendar className="w-3 h-3" />
                 Created At
               </label>
-              <p className="text-sm text-[#f4f4f4] font-medium">
+              <p className="text-sm text-slate-800 dark:text-slate-100 font-medium">
                 {new Date(ticket.created_at).toLocaleString()}
               </p>
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] uppercase tracking-widest font-bold text-[#c6c6c6] flex items-center gap-2">
+              <label className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 flex items-center gap-2">
                 <Tag className="w-3 h-3" />
                 Product Module
               </label>
-              <p className="text-sm text-[#f4f4f4] font-medium">
+              <p className="text-sm text-slate-800 dark:text-slate-100 font-medium">
                 {ticket.product_module || 'Unspecified'}
               </p>
             </div>
           </div>
 
           <div className="space-y-3">
-            <label className="text-[10px] uppercase tracking-widest font-bold text-[#c6c6c6]">Issue Context</label>
-            <div className="p-6 rounded-2xl bg-[#161616] border border-[#393939] text-sm text-[#c6c6c6] leading-relaxed whitespace-pre-wrap italic">
+            <label className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500">Issue Context</label>
+            <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 text-sm text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap italic">
               {ticket.description || "System automatically escalated this session due to high complexity and critical severity keywords detected in user input."}
             </div>
           </div>
 
           {/* Comments Section */}
-          <div className="space-y-6 pt-4 border-t border-[#393939]">
+          <div className="space-y-6 pt-4 border-t border-slate-250 dark:border-slate-850">
             <div className="flex items-center justify-between">
-              <label className="text-[10px] uppercase tracking-widest font-bold text-[#c6c6c6]">Jira Comments</label>
+              <label className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500">Jira Comments</label>
               <button 
                 onClick={handleSync}
                 disabled={isLoading}
@@ -128,25 +128,25 @@ export const TicketDetail = ({ ticket, onClose }: TicketDetailProps) => {
             <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
               {ticket.jira_comments && ticket.jira_comments.length > 0 ? (
                 ticket.jira_comments.map((c, i) => (
-                  <div key={c.id || i} className="p-4 rounded-xl bg-[#161616] border border-[#393939] space-y-2">
+                  <div key={c.id || i} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-[#393939] flex items-center justify-center">
-                          <User className="w-3 h-3 text-[#c6c6c6]" />
+                        <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center">
+                          <User className="w-3 h-3 text-slate-500 dark:text-slate-450" />
                         </div>
-                        <span className="text-[11px] font-bold text-[#f4f4f4]">{c.author || 'Jira User'}</span>
+                        <span className="text-[11px] font-bold text-slate-900 dark:text-slate-100">{c.author || 'Jira User'}</span>
                         {c.source === 'admin' && (
                           <span className="px-1.5 py-0.5 rounded-md bg-[#0f62fe]/10 text-[#0f62fe] text-[8px] font-black uppercase tracking-tighter">Copilot Admin</span>
                         )}
                       </div>
-                      <span className="text-[10px] text-[#8d8d8d]">{new Date(c.created).toLocaleString()}</span>
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500">{new Date(c.created).toLocaleString()}</span>
                     </div>
-                    <p className="text-sm text-[#c6c6c6] leading-relaxed">{c.body}</p>
+                    <p className="text-sm text-slate-700 dark:text-slate-350 leading-relaxed">{c.body}</p>
                   </div>
                 ))
               ) : (
-                <div className="py-8 text-center bg-[#161616] rounded-xl border border-[#393939] border-dashed">
-                  <p className="text-xs text-[#8d8d8d]">No comments in Jira yet.</p>
+                <div className="py-8 text-center bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 border-dashed">
+                  <p className="text-xs text-slate-400 dark:text-slate-500">No comments in Jira yet.</p>
                 </div>
               )}
             </div>
@@ -157,7 +157,7 @@ export const TicketDetail = ({ ticket, onClose }: TicketDetailProps) => {
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
                 placeholder="Add a comment to Jira..."
-                className="flex-1 bg-[#161616] border border-[#393939] rounded-xl py-2.5 px-4 text-sm text-[#f4f4f4] focus:outline-none focus:border-[#0f62fe] focus:bg-[#262626] transition-all"
+                className="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-2.5 px-4 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-[#0f62fe] dark:focus:border-blue-500 focus:bg-slate-100 dark:focus:bg-slate-900 transition-all"
               />
               <button
                 type="submit"
@@ -171,8 +171,8 @@ export const TicketDetail = ({ ticket, onClose }: TicketDetailProps) => {
         </div>
 
         {/* Footer */}
-        <div className="px-8 py-6 border-t border-[#393939] bg-[#161616] flex items-center justify-between">
-          <div className="text-xs text-[#8d8d8d]">
+        <div className="px-8 py-6 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 flex items-center justify-between transition-colors duration-300">
+          <div className="text-xs text-slate-400 dark:text-slate-500">
             Jira Sync: <span className={ticket.jira_synced ? "text-[#24a148] font-bold uppercase" : "text-amber-500 font-bold uppercase"}>
               {ticket.jira_synced ? "Healthy" : "Pending Sync"}
             </span>
@@ -180,7 +180,7 @@ export const TicketDetail = ({ ticket, onClose }: TicketDetailProps) => {
           <div className="flex items-center gap-3">
             <button
               onClick={onClose}
-              className="px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest text-[#c6c6c6] hover:text-[#f4f4f4] transition-colors"
+              className="px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-450 hover:text-slate-800 dark:hover:text-white transition-colors"
             >
               Close
             </button>
@@ -189,7 +189,7 @@ export const TicketDetail = ({ ticket, onClose }: TicketDetailProps) => {
                 href={`https://your-domain.atlassian.net/browse/${ticket.jira_issue_key}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-6 py-2.5 rounded-xl bg-[#393939] border border-[#393939] text-[#f4f4f4] text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-[#525252] transition-all"
+                className="px-6 py-2.5 rounded-xl bg-slate-200 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-slate-350 dark:hover:bg-slate-700 transition-all"
               >
                 View in Jira
                 <ExternalLink className="w-3.5 h-3.5" />

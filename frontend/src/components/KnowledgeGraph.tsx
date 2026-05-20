@@ -37,17 +37,21 @@ const RootNode = ({ data }: { data: GraphNodeData }) => (
 );
 
 const SourceNode = ({ data }: { data: GraphNodeData }) => (
-  <div className={`flex flex-col p-3 rounded-xl border-2 transition-all w-48 shadow-sm ${data.isActive ? 'border-[#0f62fe] bg-[#f4f8ff] shadow-[#0f62fe]/20' : 'border-[#e0e0e0] bg-white'}`}>
+  <div className={`flex flex-col p-3 rounded-xl border-2 transition-all w-48 shadow-sm ${
+    data.isActive 
+      ? 'border-[#0f62fe] dark:border-blue-500 bg-[#f4f8ff] dark:bg-blue-950/15 shadow-[#0f62fe]/20' 
+      : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900'
+  }`}>
     <Handle type="target" position={Position.Left} className="opacity-0" />
     <div className="flex items-start gap-2 mb-2">
-      <FileText className={`w-4 h-4 shrink-0 mt-0.5 ${data.isActive ? 'text-[#0f62fe]' : 'text-gray-400'}`} />
-      <span className="text-[11px] font-bold text-gray-800 leading-tight break-words line-clamp-3">
+      <FileText className={`w-4 h-4 shrink-0 mt-0.5 ${data.isActive ? 'text-[#0f62fe]' : 'text-slate-400 dark:text-slate-500'}`} />
+      <span className="text-[11px] font-bold text-slate-850 dark:text-slate-100 leading-tight break-words line-clamp-3">
         {data.label}
       </span>
     </div>
-    <div className="flex justify-between items-center mt-auto pt-2 border-t border-gray-100">
-      <span className="text-[9px] text-gray-500 font-medium uppercase">{data.status}</span>
-      <span className="text-[9px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-bold">{data.chunk_count} chunks</span>
+    <div className="flex justify-between items-center mt-auto pt-2 border-t border-slate-100 dark:border-slate-800">
+      <span className="text-[9px] text-slate-500 dark:text-slate-450 font-medium uppercase">{data.status}</span>
+      <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-650 dark:text-slate-350 font-bold">{data.chunk_count} chunks</span>
     </div>
   </div>
 );
@@ -124,15 +128,15 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ activeSourceIds 
                    }
                };
            }
-        });
+         });
 
         const newEdges: Edge[] = data.edges.map((e: ServerEdge) => ({
             id: e.id,
             source: e.source,
             target: e.target,
             animated: true,
-            style: { stroke: '#e0e0e0', strokeWidth: 1.5 },
-            markerEnd: { type: MarkerType.ArrowClosed, color: '#e0e0e0' }
+            style: { stroke: '#cbd5e1', strokeWidth: 1.5 },
+            markerEnd: { type: MarkerType.ArrowClosed, color: '#cbd5e1' }
         }));
 
         setNodes(newNodes);
@@ -160,8 +164,8 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ activeSourceIds 
           return {
               ...e,
               animated: isActive,
-              style: { stroke: isActive ? '#0f62fe' : '#e0e0e0', strokeWidth: isActive ? 2 : 1.5 },
-              markerEnd: { type: MarkerType.ArrowClosed, color: isActive ? '#0f62fe' : '#e0e0e0' }
+              style: { stroke: isActive ? '#0f62fe' : '#cbd5e1', strokeWidth: isActive ? 2 : 1.5 },
+              markerEnd: { type: MarkerType.ArrowClosed, color: isActive ? '#0f62fe' : '#cbd5e1' }
           };
       }));
   }, [activeSourceIds, setNodes, setEdges]);
@@ -173,11 +177,11 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ activeSourceIds 
   };
 
   if (loading) {
-      return <div className="w-full h-full flex items-center justify-center text-xs text-[#a8a8a8]">Loading Graph...</div>;
+      return <div className="w-full h-full flex items-center justify-center text-xs text-slate-400 dark:text-slate-500">Loading Graph...</div>;
   }
 
   return (
-    <div className="relative w-full h-full bg-[#f4f4f4] rounded-2xl overflow-hidden border border-[#e0e0e0] flex">
+    <div className="relative w-full h-full bg-slate-50 dark:bg-slate-950 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 flex transition-colors duration-300">
       <div className="flex-1 h-full">
           <ReactFlow
             nodes={nodes}
@@ -189,8 +193,8 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ activeSourceIds 
             fitView
             fitViewOptions={{ padding: 0.2 }}
           >
-            <Background color="#ccc" gap={16} size={1} />
-            <Controls showInteractive={false} />
+            <Background color="#cbd5e1" gap={16} size={1} className="opacity-40 dark:opacity-10" />
+            <Controls showInteractive={false} className="dark:bg-slate-900 dark:border-slate-800 dark:text-white" />
           </ReactFlow>
       </div>
 
@@ -201,25 +205,25 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ activeSourceIds 
                   animate={{ x: 0, opacity: 1 }}
                   exit={{ x: '100%', opacity: 0 }}
                   transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                  className="absolute right-0 top-0 bottom-0 w-80 bg-white border-l border-[#e0e0e0] shadow-2xl flex flex-col z-10"
+                  className="absolute right-0 top-0 bottom-0 w-80 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col z-10 transition-colors duration-300"
               >
-                  <div className="p-4 border-b border-[#e0e0e0] flex justify-between items-start bg-gray-50">
+                  <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-start bg-slate-50 dark:bg-slate-950">
                       <div>
-                          <h3 className="text-sm font-bold text-gray-900 leading-tight pr-4">{selectedNodeData.label}</h3>
-                          <p className="text-[10px] text-gray-500 mt-1 uppercase tracking-wider font-semibold">{selectedNodeData.status} • {selectedNodeData.chunk_count} Chunks</p>
+                          <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-tight pr-4">{selectedNodeData.label}</h3>
+                          <p className="text-[10px] text-slate-500 dark:text-slate-450 mt-1 uppercase tracking-wider font-semibold">{selectedNodeData.status} • {selectedNodeData.chunk_count} Chunks</p>
                       </div>
-                      <button onClick={() => setSelectedNodeData(null)} className="p-1 hover:bg-gray-200 rounded-md transition-colors text-gray-500 shrink-0">
+                      <button onClick={() => setSelectedNodeData(null)} className="p-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-md transition-colors text-slate-500 dark:text-slate-400 shrink-0">
                           <X className="w-4 h-4" />
                       </button>
                   </div>
                   <div className="p-4 flex-1 overflow-y-auto">
-                      <h4 className="text-xs font-bold text-gray-800 mb-2 uppercase tracking-wide">RAG Context Snapshot</h4>
+                      <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 mb-2 uppercase tracking-wide">RAG Context Snapshot</h4>
                       {selectedNodeData.content ? (
-                          <div className="text-[11px] text-gray-700 font-mono bg-gray-50 p-3 rounded-lg border border-gray-100 whitespace-pre-wrap leading-relaxed">
+                          <div className="text-[11px] text-slate-700 dark:text-slate-300 font-mono bg-slate-50 dark:bg-slate-950 p-3 rounded-lg border border-slate-200 dark:border-slate-850 whitespace-pre-wrap leading-relaxed">
                               {selectedNodeData.content}
                           </div>
                       ) : (
-                          <p className="text-xs text-gray-400 italic">No context available. Content may not have been fully ingested.</p>
+                          <p className="text-xs text-slate-400 dark:text-slate-550 italic">No context available. Content may not have been fully ingested.</p>
                       )}
                   </div>
               </motion.div>
