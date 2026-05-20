@@ -46,12 +46,6 @@ class TicketInfo(BaseModel):
     status: str
 
 
-class ChatRequest(BaseModel):
-    message: str = Field(..., min_length=1)
-    follow_up_responses: list[str] | None = None
-    attachments: list[AttachmentParseResponse] | None = None
-
-
 class AttachmentParseResponse(BaseModel):
     attachment_type: str
     file_name: str
@@ -64,6 +58,12 @@ class AttachmentParseResponse(BaseModel):
     important_evidence: list[str] = Field(default_factory=list)
     confidence: float
     warnings: list[str] = Field(default_factory=list)
+
+
+class ChatRequest(BaseModel):
+    message: str = Field(..., min_length=1)
+    follow_up_responses: list[str] | None = None
+    attachments: list[AttachmentParseResponse] | None = None
 
 
 class ChatResponse(BaseModel):

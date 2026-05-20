@@ -16,7 +16,7 @@ export const useKnowledgePolling = () => {
         console.log('🔄 [Admin] Starting knowledge status polling...')
         timerRef.current = setInterval(() => {
           loadKnowledgeSources()
-        }, 5000) // Poll every 5 seconds
+        }, 1500) // Poll every 1.5 seconds
       }
     } else {
       if (timerRef.current) {

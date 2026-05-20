@@ -122,8 +122,19 @@ export const useAdminStore = create<AdminState>((set, get) => ({
     set({ isAddingSource: true, error: null })
     try {
       const response = await api.post('/knowledge/sources', { url, title })
+      const newSource: KnowledgeSource = {
+        id: response.data.source_id,
+        url,
+        title: title || url,
+        source_type: 'web_page',
+        status: response.data.status || 'pending',
+        chunk_count: 0,
+        pages_crawled: 0,
+        max_pages: 200,
+        created_at: new Date().toISOString()
+      }
       set((state) => ({
-        knowledgeSources: [response.data, ...state.knowledgeSources],
+        knowledgeSources: [newSource, ...state.knowledgeSources],
         isAddingSource: false,
       }))
     } catch (err: unknown) {

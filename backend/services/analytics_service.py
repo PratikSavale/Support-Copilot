@@ -202,11 +202,14 @@ class AnalyticsService:
         )
         rows = result.all()
         
+        def get_severity_str(sev):
+            return sev.value if hasattr(sev, "value") else str(sev)
+
         return [
             CommonIssue(
-                pattern=f"{row.product_module} - {row.severity.value}",
+                pattern=f"{row.product_module} - {get_severity_str(row.severity)}",
                 count=row.count,
-                severity=row.severity.value,
+                severity=get_severity_str(row.severity),
                 last_seen=row.last_seen,
             )
             for row in rows

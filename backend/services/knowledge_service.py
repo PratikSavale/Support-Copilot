@@ -148,6 +148,10 @@ class KnowledgeService:
                 if not pages:
                     raise ValueError("Fetched content is too short, empty, or crawler returned no valid pages")
 
+                # Crawling completed. Set pages_crawled to max_pages to signal embedding/indexing phase.
+                source.pages_crawled = source.max_pages
+                await db.commit()
+
                 # 2. Clean and deduplicate pages before chunking.
                 pages = clean_and_filter_pages(pages)
                 if not pages:

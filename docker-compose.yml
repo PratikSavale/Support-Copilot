@@ -10,6 +10,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    ports:
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
@@ -20,9 +22,13 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    ports:
+      - "6379:6379"
 
   chroma:
     image: docker.io/chromadb/chroma:latest
+    ports:
+      - "8001:8000"
     volumes:
       - chroma_data:/chroma/chroma
     # ChromaDB healthcheck
