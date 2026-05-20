@@ -1,6 +1,6 @@
-# Support-Copilot Development Guidelines
+# EscalateAI Development Guidelines
 
-This document outlines the coding standards, architectural principles, and workflows for the Support-Copilot project. Our primary goal is to maintain a codebase that is **high quality, readable, and simple**.
+This document outlines the coding standards, architectural principles, and workflows for the EscalateAI project. Our primary goal is to maintain a codebase that is **high quality, readable, and simple**.
 
 ---
 
