@@ -1,65 +1,214 @@
+"""Chat API endpoints (User View)."""
+
+from __future__ import annotations
+
 from uuid import UUID
 
-from fastapi import APIRouter, Body, HTTPException, status
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
 
+from api.dependencies import CurrentUser, DbSession
 from schemas.chat import (
+    AttachmentParseResponse,
     ChatRequest,
     ChatResponse,
+    MessageResponse,
     SessionCreate,
     SessionDetailResponse,
     SessionListResponse,
     SessionResponse,
+    ChatFeedbackRequest,
 )
+from services.service_factory import get_chat_service
+from utils.attachment_parser import AttachmentKind, AttachmentParser
 
 router = APIRouter()
+
+
+@router.post(
+    "/attachments/parse",
+    response_model=AttachmentParseResponse,
+)
+async def parse_attachment(
+    current_user: CurrentUser,
+    file: UploadFile = File(...),
+    attachment_type: AttachmentKind = Query("auto"),
+) -> AttachmentParseResponse:
+    """Parse a user-provided issue attachment into a searchable issue summary."""
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+
+    data = await file.read()
+    if not data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded file is empty",
+        )
+
+    parser = AttachmentParser()
+    try:
+        result = await parser.parse(
+            file_name=file.filename or "attachment",
+            mime_type=file.content_type or "application/octet-stream",
+            data=data,
+            attachment_type=attachment_type,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    return AttachmentParseResponse(**result.to_dict())
 
 
 @router.post(
     "/sessions",
     response_model=SessionResponse,
     status_code=status.HTTP_201_CREATED,
-    responses={501: {"description": "Not implemented yet"}},
 )
 async def create_session(
-    _: SessionCreate | None = Body(default=None),
+    db: DbSession,
+    current_user: CurrentUser,
+    _: SessionCreate | None = None,
 ) -> SessionResponse:
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Not implemented",
-    )
+    """Create a new chat session."""
+    chat_service = get_chat_service()
+    session = await chat_service.create_session(db, user_id=str(current_user.id))
+    return SessionResponse.model_validate(session)
 
 
 @router.post(
     "/sessions/{session_id}/messages",
     response_model=ChatResponse,
-    responses={501: {"description": "Not implemented yet"}},
 )
-async def send_message(session_id: UUID, _message: ChatRequest) -> ChatResponse:
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Not implemented",
-    )
+async def send_message(
+    session_id: UUID,
+    message: ChatRequest,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> ChatResponse:
+    """Send a user message and get an AI response."""
+    chat_service = get_chat_service()
+    # Ensure session exists and belongs to current user
+    session = await chat_service.get_session(db, str(session_id))
+    if session and str(session.user_id) != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Not authorized to access this session")
+        
+    try:
+        response = await chat_service.process_message(
+            db=db,
+            session_id=str(session_id),
+            user_message=message.message,
+            follow_up_responses=message.follow_up_responses,
+            user_id=str(current_user.id),
+            attachments=[a.model_dump() for a in message.attachments] if message.attachments else None,
+        )
+        return response
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        )
 
 
 @router.get(
     "/sessions",
     response_model=SessionListResponse,
-    responses={501: {"description": "Not implemented yet"}},
 )
-async def list_sessions() -> SessionListResponse:
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Not implemented",
+async def list_sessions(db: DbSession, current_user: CurrentUser) -> SessionListResponse:
+    """List all chat sessions."""
+    chat_service = get_chat_service()
+    sessions = await chat_service.list_sessions(db, user_id=str(current_user.id))
+    return SessionListResponse(
+        sessions=[SessionResponse.model_validate(s) for s in sessions]
     )
 
 
 @router.get(
     "/sessions/{session_id}",
     response_model=SessionDetailResponse,
-    responses={501: {"description": "Not implemented yet"}},
 )
-async def get_session(session_id: UUID) -> SessionDetailResponse:
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Not implemented",
+async def get_session(session_id: UUID, db: DbSession, current_user: CurrentUser) -> SessionDetailResponse:
+    """Get a session with its full message history."""
+    chat_service = get_chat_service()
+    session = await chat_service.get_session(db, str(session_id))
+    if not session:
+        # Return a skeleton session for newly generated IDs to avoid 404 noise
+        from datetime import datetime, timezone
+        return SessionDetailResponse(
+            id=session_id,
+            title="New Conversation",
+            status="active",
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
+            messages=[],
+        )
+    if str(session.user_id) != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Not authorized to access this session")
+        
+    messages_response = []
+    for m in session.messages:
+        resp = MessageResponse.model_validate(m)
+        if m.action == "escalated":
+            # Find the associated ticket
+            ticket = next((t for t in session.tickets), None)
+            if ticket:
+                if ticket.jira_issue_key:
+                    try:
+                        from services.service_factory import get_jira_client
+                        jira_client = get_jira_client()
+                        await jira_client.sync_status(str(ticket.id), db)
+                        await db.refresh(ticket)
+                    except Exception as exc:
+                        import logging
+                        logging.getLogger(__name__).warning(
+                            f"Auto-sync failed for ticket {ticket.id} in get_session: {exc}"
+                        )
+                
+                from schemas.chat import TicketInfo
+                from config.settings import get_settings
+                settings = get_settings()
+                jira_base_url = (settings.JIRA_URL or "").rstrip("/")
+                jira_url = f"{jira_base_url}/browse/{ticket.jira_issue_key}" if ticket.jira_issue_key and jira_base_url else None
+                
+                resp.ticket = TicketInfo(
+                    id=str(ticket.id),
+                    jira_issue_key=ticket.jira_issue_key,
+                    jira_url=jira_url,
+                    summary=ticket.summary,
+                    severity=ticket.severity.value if hasattr(ticket.severity, "value") else str(ticket.severity),
+                    status=ticket.status.value if hasattr(ticket.status, "value") else str(ticket.status),
+                )
+        messages_response.append(resp)
+        
+    return SessionDetailResponse(
+        id=session.id,
+        title=session.title,
+        status=session.status,
+        created_at=session.created_at,
+        updated_at=session.updated_at,
+        messages=messages_response,
     )
+
+
+@router.post(
+    "/sessions/{session_id}/messages/{message_id}/feedback",
+    status_code=status.HTTP_200_OK,
+)
+async def submit_feedback(
+    session_id: UUID,
+    message_id: UUID,
+    feedback: ChatFeedbackRequest,
+    db: DbSession,
+    current_user: CurrentUser,
+):
+    """Submit user feedback (thumbs up/down) for a specific assistant message."""
+    chat_service = get_chat_service()
+    session = await chat_service.get_session(db, str(session_id))
+    if session and str(session.user_id) != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Not authorized to access this session")
+
+    await chat_service.submit_message_feedback(
+        db=db,
+        session_id=str(session_id),
+        message_id=str(message_id),
+        status=feedback.status,
+    )
+    return {"status": "ok"}

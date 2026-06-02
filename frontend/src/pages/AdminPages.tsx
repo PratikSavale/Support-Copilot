@@ -1,0 +1,667 @@
+import { useAdminStore, type IssueType } from '../store/adminStore'
+import { type Session } from '../store/userStore'
+import { StatCard } from '../components/StatCard'
+import {
+  MessageSquare,
+  CheckCircle,
+  AlertCircle,
+  TrendingUp,
+  Users,
+  Activity,
+  Plus,
+  Globe,
+  RefreshCw,
+  Trash2,
+  ExternalLink,
+  Loader2,
+  BookOpen,
+  Filter,
+  Search,
+  ChevronRight,
+  Inbox,
+  ShieldAlert
+} from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { useState, useEffect } from 'react'
+import { StatusBadge } from '../components/StatusBadge'
+import { TicketDetail } from '../components/TicketDetail'
+import axios from 'axios'
+import { API_BASE_URL } from '../config/api'
+
+// --- Sub-component: ManualEscalateModal ---
+const ManualEscalateModal = ({ onClose }: { onClose: () => void }) => {
+  const { loadIssueTypes, loadTickets } = useAdminStore()
+  const [sessions, setSessions] = useState<Session[]>([])
+  const [issueTypes, setIssueTypes] = useState<IssueType[]>([])
+  const [selectedSession, setSelectedSession] = useState('')
+  const [selectedIssueType, setSelectedIssueType] = useState('Bug')
+  const [isEscalating, setIsEscalating] = useState(false)
+  const [isLoadingData, setIsLoadingData] = useState(true)
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [sessionsRes, types] = await Promise.all([
+          axios.get(`${API_BASE_URL}/chat/sessions`),
+          loadIssueTypes()
+        ])
+        setSessions(sessionsRes.data.sessions || sessionsRes.data)
+        setIssueTypes(types)
+        if (types.length > 0) setSelectedIssueType(types[0].name)
+      } catch (err) {
+        console.error('Failed to load escalation data', err)
+      } finally {
+        setIsLoadingData(false)
+      }
+    }
+    fetchData()
+  }, [loadIssueTypes])
+
+  const handleEscalate = async () => {
+    if (!selectedSession) return
+    setIsEscalating(true)
+    try {
+      await axios.post(`${API_BASE_URL}/tickets/escalate`, {
+        session_id: selectedSession,
+        issue_type: selectedIssueType
+      })
+      await loadTickets()
+      onClose()
+    } catch (err) {
+      console.error('Escalation failed', err)
+    } finally {
+      setIsEscalating(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="absolute inset-0 bg-[#161616]/60 dark:bg-[#161616]/90 backdrop-blur-md"
+      />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="relative w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 space-y-8 shadow-2xl transition-colors duration-300"
+      >
+        <div className="flex items-center gap-4">
+          <div className="p-3 rounded-2xl bg-[#0f62fe]/20">
+            <ShieldAlert className="w-6 h-6 text-[#0f62fe] dark:text-blue-450" />
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white">Manual Escalation</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Convert a chat session into a Jira ticket.</p>
+          </div>
+        </div>
+
+        {isLoadingData ? (
+          <div className="py-12 flex justify-center">
+            <Loader2 className="w-8 h-8 text-[#0f62fe] dark:text-blue-500 animate-spin" />
+          </div>
+        ) : (
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <label className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 ml-1">Select Session</label>
+              <select
+                value={selectedSession}
+                onChange={(e) => setSelectedSession(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl py-3 px-4 text-sm text-slate-850 dark:text-white focus:outline-none focus:border-[#0f62fe] dark:focus:border-blue-500"
+              >
+                <option value="">Choose a session...</option>
+                {sessions.map(s => (
+                  <option key={s.id} value={s.id}>{s.title || 'Untitled'} ({s.id.slice(0, 8)})</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 ml-1">Jira Issue Type</label>
+              <div className="grid grid-cols-2 gap-3">
+                {issueTypes.map(type => (
+                  <button
+                    key={type.id}
+                    onClick={() => setSelectedIssueType(type.name)}
+                    className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${selectedIssueType === type.name
+                        ? 'bg-[#0f62fe]/10 dark:bg-blue-500/10 border-[#0f62fe] dark:border-blue-500 text-[#0f62fe] dark:text-blue-400 font-bold shadow-sm'
+                        : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-850 text-slate-650 dark:text-slate-350 hover:border-slate-350 dark:hover:border-slate-750'
+                      }`}
+                  >
+                    {type.iconUrl && <img src={type.iconUrl} alt="" className="w-4 h-4" />}
+                    <span className="text-xs font-bold">{type.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-center gap-4 pt-4">
+          <button
+            onClick={onClose}
+            className="flex-1 py-3 text-xs font-bold uppercase tracking-widest text-slate-550 dark:text-slate-450 hover:text-slate-850 dark:hover:text-white transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleEscalate}
+            disabled={!selectedSession || isEscalating}
+            className="flex-[2] py-3 rounded-xl bg-[#0f62fe] text-white text-xs font-bold uppercase tracking-widest hover:bg-[#0043ce] disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+          >
+            {isEscalating && <Loader2 className="w-4 h-4 animate-spin" />}
+            {isEscalating ? 'Escalating...' : 'Create Jira Ticket'}
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  )
+}
+
+export const AdminDashboard = () => {
+  const { metrics, isLoading, error } = useAdminStore()
+
+  if (isLoading && !metrics) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <div key={i} className="h-40 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 animate-pulse" />
+        ))}
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="p-8 rounded-2xl bg-[#da1e28]/10 border border-[#da1e28]/20 text-[#da1e28] text-sm text-center">
+        {error}
+      </div>
+    )
+  }
+
+  if (!metrics) return null
+
+  const stats = [
+    {
+      title: 'Total Queries',
+      value: metrics.total_queries.toLocaleString(),
+      icon: MessageSquare,
+      color: 'text-blue-400',
+      bgColor: 'bg-blue-500/20',
+    },
+    {
+      title: 'Resolution Rate',
+      value: `${metrics.resolution_rate}%`,
+      icon: CheckCircle,
+      color: 'text-emerald-400',
+      bgColor: 'bg-emerald-500/20',
+    },
+    {
+      title: 'Escalation Rate',
+      value: `${metrics.escalation_rate}%`,
+      icon: AlertCircle,
+      color: 'text-rose-400',
+      bgColor: 'bg-rose-500/20',
+    },
+    {
+      title: 'Avg Confidence',
+      value: metrics.avg_confidence_score.toFixed(2),
+      icon: TrendingUp,
+      color: 'text-purple-400',
+      bgColor: 'bg-purple-500/20',
+    },
+    {
+      title: 'Total Chats',
+      value: metrics.total_tickets.toLocaleString(),
+      icon: Activity,
+      color: 'text-amber-400',
+      bgColor: 'bg-amber-500/20',
+    },
+    {
+      title: 'Total Sessions',
+      value: metrics.total_sessions.toLocaleString(),
+      icon: Users,
+      color: 'text-indigo-400',
+      bgColor: 'bg-indigo-500/20',
+    },
+  ]
+
+  return (
+    <div className="space-y-8">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">System Overview</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Real-time performance metrics and support activity.</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {stats.map((stat) => (
+          <StatCard key={stat.title} {...stat} />
+        ))}
+      </div>
+
+      {/* Placeholder for future Charts */}
+      <div className="grid grid-cols-1 gap-6">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="h-64 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 flex flex-col justify-end gap-4 transition-colors duration-300"
+        >
+          <div className="flex flex-col gap-1">
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Activity Timeline</h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Knowledge ingestion and query volume trends.</p>
+          </div>
+          <div className="h-24 w-full flex items-end gap-1">
+            {[...Array(40)].map((_, i) => (
+              <div
+                key={i}
+                className="flex-1 bg-[#0f62fe]/50 rounded-t-sm hover:bg-[#0f62fe] transition-all cursor-pointer"
+                style={{ height: `${((i * 13) % 40) + 40}%` }}
+              />
+            ))}
+          </div>
+        </motion.div>
+      </div>
+    </div>
+  )
+}
+
+
+// --- Sub-component: AddSourceForm ---
+const AddSourceForm = () => {
+  const { addKnowledgeSource, isAddingSource, error, clearError } = useAdminStore()
+  const [url, setUrl] = useState('')
+  const [title, setTitle] = useState('')
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!url.trim()) return
+
+    await addKnowledgeSource(url.trim(), title.trim() || undefined)
+    setUrl('')
+    setTitle('')
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="p-8 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-6 transition-colors duration-300"
+    >
+      <div className="flex items-center gap-3">
+        <div className="p-2 rounded-xl bg-[#0f62fe]/20">
+          <Plus className="w-5 h-5 text-[#0f62fe] dark:text-blue-450" />
+        </div>
+        <h3 className="text-xl font-bold text-slate-900 dark:text-white">Add Knowledge Source</h3>
+      </div>
+
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="flex flex-col gap-2">
+          <label className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 ml-1">Documentation URL</label>
+          <div className="relative group">
+            <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-[#0f62fe] transition-colors" />
+            <input
+              type="url"
+              value={url}
+              onChange={(e) => { setUrl(e.target.value); clearError() }}
+              placeholder="https://docs.example.com/guide"
+              required
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-3 pl-12 pr-4 text-sm text-slate-850 dark:text-white focus:outline-none focus:border-[#0f62fe] dark:focus:border-blue-500 focus:bg-slate-100 dark:focus:bg-slate-900 transition-all"
+            />
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <label className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 ml-1">Friendly Title (Optional)</label>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Troubleshooting Guide"
+            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-3 px-4 text-sm text-slate-850 dark:text-white focus:outline-none focus:border-[#0f62fe] dark:focus:border-blue-500 focus:bg-slate-100 dark:focus:bg-slate-900 transition-all"
+          />
+        </div>
+
+        {error && (
+          <div className="md:col-span-2 text-[#da1e28] text-xs font-medium px-4 py-2 rounded-lg bg-[#da1e28]/10 border border-[#da1e28]/20">
+            {error}
+          </div>
+        )}
+
+        <div className="md:col-span-2 flex justify-end">
+          <button
+            type="submit"
+            disabled={isAddingSource || !url.trim()}
+            className="px-6 py-3 rounded-xl bg-[#0f62fe] text-[#ffffff] text-xs font-bold uppercase tracking-widest hover:bg-[#0043ce] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 shadow-sm"
+          >
+            {isAddingSource ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+            {isAddingSource ? 'Indexing...' : 'Ingest Source'}
+          </button>
+        </div>
+      </form>
+    </motion.div>
+  )
+}
+
+// --- Sub-component: SourceList ---
+const SourceList = () => {
+  const { knowledgeSources, isRefreshing, reindexSource, deleteKnowledgeSource, isLoading } = useAdminStore()
+
+  if (isLoading && knowledgeSources.length === 0) {
+    return (
+      <div className="space-y-4">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-20 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 animate-pulse" />
+        ))}
+      </div>
+    )
+  }
+
+  if (knowledgeSources.length === 0) {
+    return (
+      <div className="p-20 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center text-center gap-4 transition-colors duration-300">
+        <div className="w-12 h-12 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 flex items-center justify-center">
+          <BookOpen className="w-6 h-6 text-slate-400 dark:text-slate-500" />
+        </div>
+        <div className="space-y-1">
+          <h3 className="text-slate-900 dark:text-white font-medium">No Knowledge Sources</h3>
+          <p className="text-slate-500 dark:text-slate-450 text-sm max-w-xs">Add your first documentation URL above to start building your AI's expertise.</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between px-2">
+        <h3 className="text-sm font-bold text-slate-450 dark:text-slate-500 uppercase tracking-widest">Active Sources ({knowledgeSources.length})</h3>
+      </div>
+
+      <div className="space-y-3">
+        {knowledgeSources.map((source) => (
+          <motion.div
+            layout
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            key={source.id}
+            className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-between group hover:bg-slate-50/50 dark:hover:bg-slate-850/55 transition-all duration-300"
+          >
+            <div className="flex items-center gap-4 flex-1 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 flex items-center justify-center flex-shrink-0">
+                <Globe className="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-[#0f62fe] dark:group-hover:text-blue-400 transition-colors" />
+              </div>
+              <div className="flex flex-col gap-0.5 min-w-0">
+                <div className="flex items-center gap-3">
+                  <h4 className="text-slate-900 dark:text-white font-bold truncate">{source.title || source.url}</h4>
+                  <StatusBadge status={source.status} />
+                </div>
+                <p className="text-xs text-slate-400 dark:text-slate-500 truncate font-mono">{source.url}</p>
+                <div className="flex items-center gap-4 mt-2">
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest font-bold">
+                    {source.chunk_count} Chunks
+                  </span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest font-bold">
+                    Type: {source.source_type}
+                  </span>
+                </div>
+
+                {source.status === 'processing' && (
+                  <div className="mt-3 space-y-1.5 min-w-[250px] max-w-md">
+                    {(() => {
+                      const crawled = source.pages_crawled || 0;
+                      const max = source.max_pages || 200;
+                      const isEmbedding = crawled >= max;
+                      const percent = isEmbedding ? 95 : Math.min(90, (crawled / max) * 90);
+                      const statusText = isEmbedding
+                        ? "Generating Embeddings & Indexing..."
+                        : "Crawling & Ingesting Pages...";
+
+                      return (
+                        <>
+                          <div className="flex items-center justify-between text-[9px] font-bold uppercase tracking-widest text-[#0f62fe]">
+                            <span className="flex items-center gap-1.5">
+                              <Loader2 className={`w-3 h-3 animate-spin text-[#0f62fe] ${isEmbedding ? 'animate-pulse' : ''}`} />
+                              {statusText}
+                            </span>
+                            <span className={isEmbedding ? 'animate-pulse' : ''}>
+                              {isEmbedding ? '95%' : `${Math.round(percent)}%`} ({crawled} / {max})
+                            </span>
+                          </div>
+                          <div className="h-1.5 w-full bg-[#161616] border border-[#393939] rounded-full overflow-hidden">
+                            <motion.div
+                              initial={{ width: 0 }}
+                              animate={{ width: `${percent}%` }}
+                              transition={{ duration: 0.5, ease: "easeOut" }}
+                              className={`h-full bg-gradient-to-r from-[#0f62fe] to-[#8a3ffc] rounded-full shadow-[0_0_8px_rgba(15,98,254,0.5)] ${isEmbedding ? 'animate-pulse' : ''}`}
+                            />
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
+
+                {source.status === 'pending' && (
+                  <div className="mt-3 space-y-1.5 min-w-[250px] max-w-md">
+                    <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      Queueing for Ingestion...
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 ml-6">
+              <button
+                onClick={() => reindexSource(source.id)}
+                disabled={isRefreshing === source.id}
+                className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-205 dark:border-slate-850 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-all disabled:opacity-50"
+                title="Re-index Source"
+              >
+                <RefreshCw className={`w-4 h-4 ${isRefreshing === source.id ? 'animate-spin' : ''}`} />
+              </button>
+              <button
+                onClick={() => window.open(source.url, '_blank')}
+                className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-205 dark:border-slate-850 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
+                title="Open Original Source"
+              >
+                <ExternalLink className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => deleteKnowledgeSource(source.id)}
+                className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-205 dark:border-slate-850 text-rose-500/70 dark:text-rose-450/70 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-all"
+                title="Delete Source"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// --- Main Page Component ---
+export const KnowledgePage = () => {
+  return (
+    <div className="space-y-12">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Knowledge Base</h2>
+        <p className="text-sm text-slate-550 dark:text-slate-400 font-medium">Curate and maintain the data that powers your AI's intelligence.</p>
+      </div>
+
+      <AddSourceForm />
+      <SourceList />
+    </div>
+  )
+}
+
+
+// --- Sub-component: TicketFilters ---
+const TicketFilters = () => {
+  const { filterStatus, setFilterStatus, filterSeverity, setFilterSeverity } = useAdminStore()
+
+  return (
+    <div className="flex flex-wrap items-center gap-4">
+      <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 transition-colors duration-300">
+        <Filter className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+        <select
+          value={filterStatus || ''}
+          onChange={(e) => setFilterStatus(e.target.value || null)}
+          className="bg-transparent text-xs font-bold text-slate-650 dark:text-slate-350 focus:outline-none cursor-pointer uppercase tracking-widest"
+        >
+          <option value="" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-205">All Statuses</option>
+          <option value="open" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-205">Open</option>
+          <option value="in_progress" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-205">In Progress</option>
+          <option value="resolved" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-205">Resolved</option>
+        </select>
+      </div>
+
+      <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 transition-colors duration-300">
+        <ShieldAlert className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+        <select
+          value={filterSeverity || ''}
+          onChange={(e) => setFilterSeverity(e.target.value || null)}
+          className="bg-transparent text-xs font-bold text-slate-650 dark:text-slate-350 focus:outline-none cursor-pointer uppercase tracking-widest"
+        >
+          <option value="" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-205">All Severities</option>
+          <option value="critical" className="bg-white dark:bg-slate-900 text-slate-850 dark:text-rose-400">Critical</option>
+          <option value="high" className="bg-white dark:bg-slate-900 text-slate-850 dark:text-orange-400">High</option>
+          <option value="medium" className="bg-white dark:bg-slate-900 text-slate-850 dark:text-blue-400">Medium</option>
+          <option value="low" className="bg-white dark:bg-slate-900 text-slate-850 dark:text-slate-405">Low</option>
+        </select>
+      </div>
+
+      <div className="flex-1 min-w-[200px] relative group">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500 group-focus-within:text-[#0f62fe] transition-colors" />
+        <input
+          type="text"
+          placeholder="Search chats by summary or ID..."
+          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-2 pl-12 pr-4 text-xs text-slate-850 dark:text-white focus:outline-none focus:border-[#0f62fe] dark:focus:border-blue-500 focus:bg-slate-100 dark:focus:bg-slate-900 transition-all"
+        />
+      </div>
+    </div>
+  )
+}
+
+// --- Sub-component: TicketTable ---
+const TicketTable = () => {
+  const { tickets, isLoading, openTicketDetail } = useAdminStore()
+
+  if (isLoading && tickets.length === 0) {
+    return (
+      <div className="space-y-3">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div key={i} className="h-16 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 animate-pulse" />
+        ))}
+      </div>
+    )
+  }
+
+  if (tickets.length === 0) {
+    return (
+      <div className="p-20 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center text-center gap-4 transition-colors duration-300">
+        <div className="w-12 h-12 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 flex items-center justify-center">
+          <Inbox className="w-6 h-6 text-slate-400 dark:text-slate-500" />
+        </div>
+        <div className="space-y-1">
+          <h3 className="text-slate-900 dark:text-white font-medium">No Chats Found</h3>
+          <p className="text-slate-500 dark:text-slate-450 text-sm max-w-xs">No support requests match your current filters.</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900 transition-colors duration-300">
+      <table className="w-full text-left border-collapse">
+        <thead className="bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
+          <tr>
+            <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400">Issue</th>
+            <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400">Severity</th>
+            <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400">Status</th>
+            <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400">Created</th>
+            <th className="px-6 py-4 text-right"></th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100 dark:divide-slate-850">
+          {tickets.map((ticket) => (
+            <motion.tr
+              key={ticket.id}
+              onClick={() => openTicketDetail(ticket)}
+              className="hover:bg-slate-50/50 dark:hover:bg-slate-850/50 cursor-pointer transition-colors group"
+            >
+              <td className="px-6 py-4">
+                <div className="flex flex-col gap-0.5 max-w-md">
+                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100 group-hover:text-[#0f62fe] dark:group-hover:text-blue-450 transition-colors truncate">
+                    {ticket.summary}
+                  </span>
+                  <span className="text-[10px] text-slate-450 dark:text-slate-500 uppercase tracking-widest font-bold">
+                    {ticket.jira_issue_key || ticket.id.slice(0, 8)}
+                  </span>
+                </div>
+              </td>
+              <td className="px-6 py-4">
+                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border
+                  ${ticket.severity === 'critical' ? 'bg-rose-500/10 text-rose-550 border-rose-500/20' :
+                    ticket.severity === 'high' ? 'bg-orange-500/10 text-orange-550 border-orange-500/20' :
+                      'bg-blue-500/10 text-blue-550 border-blue-500/20'}`}
+                >
+                  {ticket.severity}
+                </span>
+              </td>
+              <td className="px-6 py-4">
+                <span className="text-[10px] text-slate-650 dark:text-slate-350 font-bold uppercase tracking-widest">
+                  {ticket.status}
+                </span>
+              </td>
+              <td className="px-6 py-4">
+                <span className="text-[10px] text-slate-450 dark:text-slate-500 font-bold uppercase tracking-widest">
+                  {new Date(ticket.created_at).toLocaleDateString()}
+                </span>
+              </td>
+              <td className="px-6 py-4 text-right">
+                <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-700 group-hover:text-[#0f62fe] dark:group-hover:text-blue-400 group-hover:translate-x-1 transition-all inline-block" />
+              </td>
+            </motion.tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// --- Main Page Component ---
+export const TicketsPage = () => {
+  const { selectedTicket, closeTicketDetail } = useAdminStore()
+  const [showEscalateModal, setShowEscalateModal] = useState(false)
+
+  return (
+    <div className="space-y-8">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Chat Oversight</h2>
+        <p className="text-sm text-slate-550 dark:text-slate-400 font-medium">Review, track, and manage escalated support requests.</p>
+      </div>
+
+      <div className="space-y-6">
+        <TicketFilters />
+        <TicketTable />
+      </div>
+
+      <AnimatePresence>
+        {selectedTicket && (
+          <TicketDetail
+            ticket={selectedTicket}
+            onClose={closeTicketDetail}
+          />
+        )}
+        {showEscalateModal && (
+          <ManualEscalateModal onClose={() => setShowEscalateModal(false)} />
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}

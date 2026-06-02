@@ -4,7 +4,7 @@ from enum import Enum
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
 
 class TicketSeverity(str, Enum):
@@ -52,8 +52,21 @@ class TicketResponse(BaseModel):
     troubleshooting_attempted: str | None = None
     conversation_summary: str | None = None
     doc_references: dict[str, Any] | None = None
+    jira_comments: list[dict[str, Any]] | None = None
+    assignee: str | None = None
+    jira_synced: bool = False
     created_at: datetime
     updated_at: datetime
+
+    @computed_field
+    @property
+    def jira_url(self) -> str | None:
+        from config.settings import get_settings
+        settings = get_settings()
+        jira_base_url = (settings.JIRA_URL or "").rstrip("/")
+        if self.jira_issue_key and jira_base_url:
+            return f"{jira_base_url}/browse/{self.jira_issue_key}"
+        return None
 
     @field_validator("severity", mode="before")
     @classmethod
@@ -100,3 +113,28 @@ class TicketUpdate(BaseModel):
 
 class TicketUpdateResponse(BaseModel):
     ticket: TicketResponse
+
+
+class TicketCommentRequest(BaseModel):
+    comment: str
+    source: str = "copilot"
+
+
+class TicketCommentResponse(BaseModel):
+    comment: dict[str, Any]
+
+
+class IssueTypeResponse(BaseModel):
+    id: str
+    name: str
+    subtask: bool
+    iconUrl: str | None = None
+
+
+class IssueTypeListResponse(BaseModel):
+    issue_types: list[IssueTypeResponse]
+
+
+class TicketSyncResponse(BaseModel):
+    updated_count: int
+    message: str

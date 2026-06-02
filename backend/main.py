@@ -6,10 +6,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.router import api_router
 from config.database import engine
 from config.settings import get_settings
+from middleware.error_handler import register_error_handlers
+from middleware.rate_limiter import setup_rate_limiter
+from api.v1.ws.websocket import router as ws_router
+from utils.logging_config import setup_logging
+from seed_admin import seed_admin
 
+setup_logging()
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    await seed_admin()
     yield
     await engine.dispose()
 
@@ -32,7 +39,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+register_error_handlers(app)
+setup_rate_limiter(app)
+
 app.include_router(api_router, prefix="/api/v1")
+app.include_router(ws_router, prefix="/api/v1/chat")
 
 
 @app.get("/health")

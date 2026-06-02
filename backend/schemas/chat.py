@@ -23,6 +23,7 @@ class Action(str, Enum):
     clarification = "clarification"
     escalated = "escalated"
     searching = "searching"
+    failed = "failed"
 
 
 class SourceInfo(BaseModel):
@@ -39,14 +40,30 @@ class TicketInfo(BaseModel):
 
     id: str
     jira_issue_key: str | None = None
+    jira_url: str | None = None
     summary: str
     severity: str
     status: str
 
 
+class AttachmentParseResponse(BaseModel):
+    attachment_type: str
+    file_name: str
+    mime_type: str
+    issue_summary: str
+    extracted_text: str = ""
+    detected_error: str | None = None
+    screen_or_area: str | None = None
+    visible_steps: list[str] = Field(default_factory=list)
+    important_evidence: list[str] = Field(default_factory=list)
+    confidence: float
+    warnings: list[str] = Field(default_factory=list)
+
+
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1)
     follow_up_responses: list[str] | None = None
+    attachments: list[AttachmentParseResponse] | None = None
 
 
 class ChatResponse(BaseModel):
@@ -99,6 +116,8 @@ class MessageResponse(BaseModel):
     content: str
     confidence_score: float | None = None
     sources: Any | None = None
+    action: Action | None = None
+    ticket: TicketInfo | None = None
     created_at: datetime
 
     @field_validator("role", mode="before")
@@ -117,3 +136,13 @@ class SessionDetailResponse(SessionResponse):
 
 class SessionListResponse(BaseModel):
     sessions: list[SessionResponse]
+
+
+class FeedbackStatus(str, Enum):
+    success = "success"
+    failed = "failed"
+
+
+class ChatFeedbackRequest(BaseModel):
+    status: FeedbackStatus
+

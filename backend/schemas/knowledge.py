@@ -24,6 +24,7 @@ class KnowledgeSourceCreate(BaseModel):
     url: str = Field(..., max_length=500, description="Documentation or file URL to ingest")
     title: str | None = Field(None, max_length=500)
     source_type: KnowledgeSourceType = KnowledgeSourceType.web_page
+    max_pages: int = Field(200, description="Max pages to crawl for web sources")
 
 
 class KnowledgeSourceResponse(BaseModel):
@@ -35,6 +36,8 @@ class KnowledgeSourceResponse(BaseModel):
     source_type: KnowledgeSourceType
     status: KnowledgeSourceStatus
     chunk_count: int
+    pages_crawled: int = 0
+    max_pages: int
     last_indexed_at: datetime | None = None
     created_at: datetime
     updated_at: datetime

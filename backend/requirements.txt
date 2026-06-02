@@ -1,41 +1,60 @@
 # Web Framework
-fastapi==0.109.2
-uvicorn[standard]==0.27.1
-python-multipart==0.0.6
+fastapi>=0.109.2
+uvicorn[standard]>=0.27.1
+python-multipart>=0.0.6
 
 # Database
-sqlalchemy==2.0.25
-asyncpg==0.29.0
-alembic==1.13.1
+sqlalchemy>=2.0.25
+asyncpg>=0.29.0
+greenlet>=3.0.3
+alembic>=1.13.1
 # psycopg2-binary has no reliable wheel on Python 3.13 in this setup.
 # Keep optional and skip install on 3.13+ to avoid pg_config build failures.
-psycopg2-binary==2.9.9; python_version < "3.13"
-pgvector==0.2.4
+psycopg2-binary>=2.9.9; python_version < "3.13"
+pgvector>=0.2.4
 
 # Validation
-pydantic==2.5.3
-pydantic-settings==2.1.0
-email-validator==2.1.0.post1
+pydantic>=2.8.2
+pydantic-settings>=2.3.4
+email-validator>=2.1.0.post1
 
 # AI/ML (Person 2+)
-langchain==0.1.9
-langchain-google-genai==0.0.6
-langchain-community==0.0.21
-# Keep compatible with langchain-google-genai==0.0.6
-google-generativeai==0.3.2
+langchain>=0.2.0
+langchain-google-genai>=1.0.0
+langchain-community>=0.2.0
+# Keep compatible with newer langchain-google-genai
+google-generativeai>=0.3.2
+google-genai>=1.11.0
+tenacity>=8.2.3
+fastembed>=0.2.0
 
 # Vector Database (Person 2+)
-chromadb==0.4.24
+chromadb==1.5.9
+
+# Web scraping (Person 3)
+beautifulsoup4>=4.12.0
+lxml>=5.0.0
 
 # Utilities
-python-dotenv==1.0.0
-httpx==0.26.0
-aiohttp==3.9.1
+python-dotenv>=1.0.0
+httpx>=0.28.1
+aiohttp>=3.9.1
+pypdf>=4.2.0
 
 # Testing
-pytest==7.4.4
-pytest-asyncio==0.23.3
+pytest>=7.4.4
+pytest-asyncio>=0.23.3
 
 # Development
-black==24.1.1
-ruff==0.2.1
+black>=24.1.1
+ruff>=0.2.1
+
+# Analytics & Utilities (Person 4)
+slowapi>=0.1.9
+python-json-logger>=2.0.7
+prometheus-client>=0.19.0
+websockets>=12.0
+
+# Security & Authentication
+passlib[bcrypt]>=1.7.4
+python-jose[cryptography]>=3.5.0
