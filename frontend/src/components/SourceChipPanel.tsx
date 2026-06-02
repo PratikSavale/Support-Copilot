@@ -65,24 +65,24 @@ function deriveSection(excerpt: string): string {
 function HighlightedExcerpt({ text, query }: { text: string; query: string }) {
   const cleanText = stripMarkdown(text)
   if (NAV_HEADINGS.includes(cleanText.toLowerCase())) {
-    return <span className="font-semibold text-slate-800">{cleanText}</span>
+    return <span className="font-semibold text-slate-800 dark:text-slate-200">{cleanText}</span>
   }
   if (!query || query.length < 3) {
-    return <span className="text-slate-600 leading-relaxed">{cleanText}</span>
+    return <span className="text-slate-650 dark:text-slate-350 leading-relaxed">{cleanText}</span>
   }
 
   const queryWords = query.toLowerCase().split(/\s+/).filter(w => w.length >= 3)
-  if (queryWords.length === 0) return <span className="text-slate-600 leading-relaxed">{cleanText}</span>
+  if (queryWords.length === 0) return <span className="text-slate-650 dark:text-slate-350 leading-relaxed">{cleanText}</span>
 
   const escapedWords = queryWords.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
   const pattern = new RegExp(`(${escapedWords.join('|')})`, 'gi')
   const parts = cleanText.split(pattern)
 
   return (
-    <span className="text-slate-600 leading-relaxed">
+    <span className="text-slate-650 dark:text-slate-350 leading-relaxed">
       {parts.map((part, i) =>
         pattern.test(part) ? (
-          <mark key={i} className="bg-yellow-200 text-slate-900 rounded-sm px-0.5 font-medium">{part}</mark>
+          <mark key={i} className="bg-yellow-100 dark:bg-yellow-950/40 text-yellow-900 dark:text-yellow-250 rounded-sm px-0.5 font-medium">{part}</mark>
         ) : (
           part
         )
@@ -127,11 +127,11 @@ export const SourceChips = ({ sources, activeIndex, onChipClick }: SourceChipsPr
             onClick={() => onChipClick(idx)}
             title={chipLabel(s)}
             className={cn(
-              'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-medium',
-              'border transition-colors cursor-pointer select-none max-w-[180px]',
+              'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-medium transition-colors duration-200',
+              'border cursor-pointer select-none max-w-[180px]',
               isActive
-                ? 'border-[#3B5BDB] bg-[#EEF2FF] text-[#3B5BDB]'
-                : 'border-[#e0e0e0] bg-[#f4f4f4] text-[#525252] hover:bg-[#e8e8e8] hover:border-[#c6c6c6]'
+                ? 'border-[#3B5BDB] dark:border-blue-500 bg-[#EEF2FF] dark:bg-blue-550/15 text-[#3B5BDB] dark:text-blue-400 font-bold shadow-sm'
+                : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-850 hover:text-slate-900 dark:hover:text-white'
             )}
           >
             {isFallback
@@ -777,7 +777,7 @@ export const SourceDetailPanel = ({ source, isOpen, onClose, userQuery, answerCo
     <AnimatePresence>
       {isOpen && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/5" onClick={handleBackdropClick} />
+          <div className="fixed inset-0 z-40 bg-black/10 dark:bg-black/40 backdrop-blur-[1px]" onClick={handleBackdropClick} />
 
           <motion.div
             ref={panelRef}
@@ -785,59 +785,54 @@ export const SourceDetailPanel = ({ source, isOpen, onClose, userQuery, answerCo
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'tween', duration: 0.3, ease: 'easeOut' }}
-            className="fixed top-0 right-0 z-50 h-full w-[480px] bg-white flex flex-col shadow-2xl border-l border-[#e0e0e0] max-sm:w-full"
+            className="fixed top-0 right-0 z-50 h-full w-[480px] bg-white dark:bg-slate-900 flex flex-col shadow-2xl border-l border-slate-200 dark:border-slate-800 max-sm:w-full transition-colors duration-300"
           >
-            <div className="h-[60%] w-full relative" style={{
-              background: '#f4f4f4',
-              border: '0.5px solid #e0e0e0',
-              borderRadius: '8px',
-              overflow: 'hidden'
-            }}>
+            <div className="h-[60%] w-full relative bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 overflow-hidden">
               <GraphDataWrapper activeSourceId={source.source_id} source={source} answerContent={answerContent} />
               <button
                 onClick={onClose}
-                className="absolute top-4 left-4 p-1.5 bg-white shadow-sm border border-[#e0e0e0] rounded-md hover:bg-gray-50 z-10 text-gray-600"
+                className="absolute top-4 left-4 p-1.5 bg-white dark:bg-slate-900 shadow-sm border border-slate-200 dark:border-slate-800 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 z-10 text-slate-650 dark:text-slate-350 transition-colors"
               >
                 <X size={16} />
               </button>
             </div>
 
-            <div className="h-[40%] flex flex-col bg-white">
+            <div className="h-[40%] flex flex-col bg-white dark:bg-slate-900 transition-colors duration-300">
               <div className="flex-1 overflow-y-auto p-5">
                 
                 <section className="mb-6">
-                  <h4 className="mb-2" style={{ fontVariantCaps: 'small-caps', fontSize: '11px', letterSpacing: '0.06em', color: '#8d8d8d' }}>Why this was retrieved</h4>
+                  <h4 className="mb-2 text-[10px] uppercase tracking-widest font-black text-slate-400 dark:text-slate-500">Why this was retrieved</h4>
                   <div className="flex items-start gap-2">
-                    <Search className="w-4 h-4 text-[#a8a8a8] shrink-0 mt-0.5" />
-                    <p className="text-sm text-[#393939] italic">
+                    <Search className="w-4 h-4 text-slate-400 dark:text-slate-550 shrink-0 mt-0.5" />
+                    <p className="text-sm text-slate-700 dark:text-slate-300 italic">
                       "{userQuery}"
                     </p>
                   </div>
                 </section>
 
-                <div style={{ borderBottom: '0.5px solid #e0e0e0', marginBottom: '24px' }} />
+                <div className="border-b border-slate-100 dark:border-slate-850 mb-6" />
 
                 <section className="mb-6">
-                  <h4 className="mb-2" style={{ fontVariantCaps: 'small-caps', fontSize: '11px', letterSpacing: '0.06em', color: '#8d8d8d' }}>Match Score</h4>
+                  <h4 className="mb-2 text-[10px] uppercase tracking-widest font-black text-slate-400 dark:text-slate-500">Match Score</h4>
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-xs text-[#525252] font-medium">Relevance</span>
-                    <span className="text-xs font-bold text-[#24a148]">{pct}%</span>
+                    <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">Relevance</span>
+                    <span className="text-xs font-bold text-[#24a148] dark:text-emerald-500">{pct}%</span>
                   </div>
-                  <div className="w-full h-1.5 bg-[#e0e0e0] rounded-full overflow-hidden">
-                    <div className="h-full bg-[#24a148]" style={{ width: `${pct}%` }} />
+                  <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                    <div className="h-full bg-[#24a148] dark:bg-emerald-500" style={{ width: `${pct}%` }} />
                   </div>
                 </section>
 
-                <div style={{ borderBottom: '0.5px solid #e0e0e0', marginBottom: '24px' }} />
+                <div className="border-b border-slate-100 dark:border-slate-850 mb-6" />
 
                 <section className="mb-6">
-                  <h4 className="mb-2" style={{ fontVariantCaps: 'small-caps', fontSize: '11px', letterSpacing: '0.06em', color: '#8d8d8d' }}>Relevant Excerpt</h4>
+                  <h4 className="mb-2 text-[10px] uppercase tracking-widest font-black text-slate-400 dark:text-slate-500">Relevant Excerpt</h4>
                   <ul className="list-disc pl-5 space-y-1.5">
                     {bullets.map((b, i) => {
                       const cleanB = stripMarkdown(b)
                       if (!cleanB) return null
                       return (
-                        <li key={i} className="text-xs text-[#393939] leading-relaxed">
+                        <li key={i} className="text-xs text-slate-650 dark:text-slate-350 leading-relaxed">
                           <HighlightedExcerpt text={cleanB} query={userQuery} />
                         </li>
                       )
@@ -845,24 +840,24 @@ export const SourceDetailPanel = ({ source, isOpen, onClose, userQuery, answerCo
                   </ul>
                 </section>
 
-                <div style={{ borderBottom: '0.5px solid #e0e0e0', marginBottom: '24px' }} />
+                <div className="border-b border-slate-100 dark:border-slate-850 mb-6" />
 
                 <section className="mb-6">
-                  <h4 className="mb-2" style={{ fontVariantCaps: 'small-caps', fontSize: '11px', letterSpacing: '0.06em', color: '#8d8d8d' }}>Used to answer</h4>
+                  <h4 className="mb-2 text-[10px] uppercase tracking-widest font-black text-slate-400 dark:text-slate-500">Used to answer</h4>
                   {(!answerContent || /general knowledge|does not contain information|not mentioned in the provided|not found in the provided|cannot answer this based on/i.test(answerContent)) ? (
-                    <p className="text-xs text-[#da1e28] leading-relaxed">
-                      This source was retrieved but <span className="font-semibold">not used</span> for the response due to insufficient relevance.
+                    <p className="text-xs text-rose-600 dark:text-rose-400 leading-relaxed font-medium">
+                      This source was retrieved but <span className="font-semibold underline decoration-rose-500/30">not used</span> for the response due to insufficient relevance.
                     </p>
                   ) : (
-                    <p className="text-xs text-[#393939] leading-relaxed">
-                      Provided supporting context from <span className="font-semibold">{stripMarkdown(source.title)}</span> for the response.
+                    <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+                      Provided supporting context from <span className="font-semibold text-slate-900 dark:text-white">{stripMarkdown(source.title)}</span> for the response.
                     </p>
                   )}
                 </section>
 
               </div>
 
-              <div className="px-5 py-3 border-t border-[#e0e0e0] bg-[#f4f4f4] flex items-center justify-between shrink-0">
+              <div className="px-5 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 flex items-center justify-between shrink-0 transition-colors duration-300">
                 {(() => {
                   let finalUrl = source.url || '#'
                   if (source.chunk_excerpt && finalUrl !== '#') {
@@ -880,14 +875,14 @@ export const SourceDetailPanel = ({ source, isOpen, onClose, userQuery, answerCo
                       href={finalUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 text-[11px] font-bold text-[#0f62fe] hover:underline uppercase tracking-wide"
+                      className="flex items-center gap-1.5 text-[11px] font-bold text-[#0f62fe] dark:text-blue-400 hover:underline uppercase tracking-widest"
                     >
                       Open full document
                       <ExternalLink className="w-3.5 h-3.5" />
                     </a>
                   )
                 })()}
-                <span className="text-[9px] font-bold tracking-wider px-2.5 py-1 rounded bg-[#e5f0ff] text-[#0043ce] border border-[#0f62fe]/20 uppercase">
+                <span className="text-[9px] font-bold tracking-wider px-2.5 py-1 rounded bg-[#e5f0ff] dark:bg-blue-900/20 text-[#0043ce] dark:text-blue-400 border border-[#0f62fe]/20 uppercase">
                   RAG
                 </span>
               </div>

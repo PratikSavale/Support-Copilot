@@ -40,7 +40,7 @@ export const Header = () => {
             <Bot className="text-white w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-[#161616] dark:text-white group-hover:text-[#0f62fe] dark:group-hover:text-blue-400 transition-colors">Support Copilot</h1>
+            <h1 className="text-xl font-bold tracking-tight text-[#161616] dark:text-white group-hover:text-[#0f62fe] dark:group-hover:text-blue-400 transition-colors">EscalateAI</h1>
             <div className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-[#24a148] animate-pulse" />
               <span className="text-[10px] uppercase tracking-widest text-[#24a148] font-bold">System Online</span>
@@ -51,11 +51,11 @@ export const Header = () => {
         <div className="flex-1 flex justify-center">
           {isChat && <KnowledgeSourceSelector />}
         </div>
-        
+
         <div className="flex items-center gap-4 min-w-[240px] justify-end">
           {isChat && (
-            <Link 
-              to="/" 
+            <Link
+              to="/"
               className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#ffffff] dark:bg-slate-800 border border-[#e0e0e0] dark:border-slate-700 text-xs text-[#525252] dark:text-slate-300 hover:text-[#161616] dark:hover:text-white hover:bg-[#f4f4f4] dark:hover:bg-slate-700 transition-all"
             >
               <LayoutGrid className="w-4 h-4" />
@@ -64,8 +64,8 @@ export const Header = () => {
           )}
 
           {user?.role === 'admin' && (
-            <Link 
-              to="/admin" 
+            <Link
+              to="/admin"
               className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-50 border border-indigo-200 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition-all"
             >
               <ShieldCheck className="w-4 h-4" />
@@ -89,7 +89,7 @@ export const Header = () => {
                 </div>
               )}
             </div>
-            
+
             <button
               onClick={toggleTheme}
               className="p-2 rounded-xl bg-[#ffffff] dark:bg-slate-800 border border-[#e0e0e0] dark:border-slate-700 text-[#525252] dark:text-slate-300 hover:text-blue-500 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-slate-700 transition-all group"
@@ -102,7 +102,7 @@ export const Header = () => {
               )}
             </button>
 
-            <button 
+            <button
               onClick={handleLogout}
               className="p-2 rounded-xl bg-[#ffffff] dark:bg-slate-800 border border-[#e0e0e0] dark:border-slate-700 text-[#525252] dark:text-slate-300 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 hover:border-rose-200 dark:hover:border-rose-900 transition-all group"
               title="Logout"

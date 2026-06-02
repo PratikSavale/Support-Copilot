@@ -320,8 +320,21 @@ class JiraClient:
         headers = self._headers()
 
         payload = {
-            "body": comment,
-            "visibility": {"type": "role", "value": "Users"},  # Visible to all
+            "body": {
+                "type": "doc",
+                "version": 1,
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": comment,
+                            }
+                        ],
+                    }
+                ],
+            },
         }
 
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -330,7 +343,7 @@ class JiraClient:
             data = response.json()
             return {
                 "id": data.get("id"),
-                "body": data.get("body"),
+                "body": comment,
                 "author": data.get("author", {}).get("displayName"),
                 "created": data.get("created"),
             }
@@ -639,14 +652,14 @@ class JiraClient:
     async def sync_status(
         self, ticket_id: str, db: Any
     ) -> bool:
-        """Sync ticket status from Jira to local database.
+        """Sync ticket status, severity, comments, and assignee from Jira to local database.
 
         Args:
             ticket_id: Local ticket UUID
             db: Database session (AsyncSession)
 
         Returns:
-            True if status was updated, False otherwise
+            True if sync succeeded, False otherwise
         """
         if self.use_mock:
             return False
@@ -672,19 +685,45 @@ class JiraClient:
             )
             return False
 
-        # Map Jira status to our TicketStatus enum
+        # 1. Update Status
         jira_status = jira_data.get("status", "")
         new_status = self._map_jira_status_to_ticket_status(jira_status)
-
-        if new_status and new_status != ticket.status:
+        if new_status:
             ticket.status = new_status
-            await db.commit()
-            logger.info(
-                f"Updated ticket {ticket_id} status from {ticket.status} to {new_status}"
-            )
-            return True
 
-        return False
+        # 2. Update Severity (Priority)
+        jira_priority = jira_data.get("priority")
+        new_severity = self._map_jira_priority_to_severity(jira_priority)
+        if new_severity:
+            ticket.severity = new_severity
+
+        # 3. Update Assignee
+        jira_assignee = jira_data.get("assignee")
+        if jira_assignee:
+            ticket.assignee = jira_assignee
+
+        # 4. Sync Comments from Jira
+        try:
+            jira_comments = await self.get_comments(ticket.jira_issue_key)
+            if jira_comments:
+                local_comments = ticket.jira_comments or []
+                comments_by_id = {c.get("id"): c for c in local_comments if c.get("id")}
+                
+                for jc in jira_comments:
+                    comments_by_id[jc["id"]] = jc
+                    
+                ticket.jira_comments = list(comments_by_id.values())
+        except Exception as exc:
+            logger.warning(f"Failed to fetch Jira comments for {ticket.jira_issue_key}: {exc}")
+
+        # 5. Mark ticket as synchronized
+        ticket.jira_synced = True
+
+        await db.commit()
+        logger.info(
+            f"Successfully fully synchronized ticket {ticket_id} from Jira"
+        )
+        return True
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -730,6 +769,79 @@ class JiraClient:
             "Closed": TicketStatus.closed.value,
         }
         return mapping.get(jira_status)
+
+    @staticmethod
+    def _map_jira_priority_to_severity(jira_priority: str) -> str | None:
+        """Map Jira priority name to our TicketSeverity enum value."""
+        from models.enums import TicketSeverity
+        if not jira_priority:
+            return TicketSeverity.medium.value
+            
+        mapping = {
+            "Lowest": TicketSeverity.low.value,
+            "Low": TicketSeverity.low.value,
+            "Medium": TicketSeverity.medium.value,
+            "High": TicketSeverity.high.value,
+            "Highest": TicketSeverity.critical.value,
+            "Critical": TicketSeverity.critical.value,
+        }
+        return mapping.get(jira_priority, TicketSeverity.medium.value)
+
+    async def get_comments(self, issue_key: str) -> list[dict[str, Any]]:
+        """Fetch all comments for a Jira issue.
+        
+        Args:
+            issue_key: Jira issue key
+            
+        Returns:
+            List of normalized comment dictionaries
+        """
+        if self.use_mock:
+            return []
+
+        url = f"{self.base_url}/rest/api/3/issue/{issue_key}/comment"
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(url, headers=self._headers())
+            if response.status_code == 404:
+                return []
+            response.raise_for_status()
+            data = response.json()
+            
+            comments = []
+            for c in data.get("comments", []):
+                body_adf = c.get("body")
+                body_text = self._extract_text_from_adf(body_adf)
+                
+                comments.append({
+                    "id": c.get("id"),
+                    "body": body_text,
+                    "author": c.get("author", {}).get("displayName", "Jira User"),
+                    "created": c.get("created"),
+                    "source": "jira",
+                })
+            return comments
+
+    @staticmethod
+    def _extract_text_from_adf(adf_dict: Any) -> str:
+        """Recursively extract plain text from Atlassian Document Format (ADF) dict."""
+        if not adf_dict or not isinstance(adf_dict, dict):
+            return str(adf_dict) if adf_dict else ""
+        
+        texts = []
+        def traverse(node):
+            if isinstance(node, dict):
+                if node.get("type") == "text":
+                    texts.append(node.get("text", ""))
+                elif node.get("type") == "mention":
+                    texts.append(node.get("attrs", {}).get("text", ""))
+                for value in node.values():
+                    traverse(value)
+            elif isinstance(node, list):
+                for item in node:
+                    traverse(item)
+                    
+        traverse(adf_dict)
+        return "".join(texts)
 
     @staticmethod
     def _extract_issue_summary(data: dict[str, Any]) -> dict[str, Any]:

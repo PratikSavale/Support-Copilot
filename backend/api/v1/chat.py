@@ -150,6 +150,18 @@ async def get_session(session_id: UUID, db: DbSession, current_user: CurrentUser
             # Find the associated ticket
             ticket = next((t for t in session.tickets), None)
             if ticket:
+                if ticket.jira_issue_key:
+                    try:
+                        from services.service_factory import get_jira_client
+                        jira_client = get_jira_client()
+                        await jira_client.sync_status(str(ticket.id), db)
+                        await db.refresh(ticket)
+                    except Exception as exc:
+                        import logging
+                        logging.getLogger(__name__).warning(
+                            f"Auto-sync failed for ticket {ticket.id} in get_session: {exc}"
+                        )
+                
                 from schemas.chat import TicketInfo
                 from config.settings import get_settings
                 settings = get_settings()

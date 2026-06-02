@@ -21,7 +21,7 @@ export const LoginPage = () => {
     setIsLoading(true)
     setError('')
     setSuccess('')
-    
+
     try {
       if (isLogin) {
         await login(email, password)
@@ -43,7 +43,7 @@ export const LoginPage = () => {
     <div className="min-h-screen bg-[#f4f4f4] dark:bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden transition-colors duration-300">
       {/* Background Decor */}
 
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md relative z-10"
@@ -57,13 +57,13 @@ export const LoginPage = () => {
               {isLogin ? 'Welcome Back' : 'Create Account'}
             </h1>
             <p className="text-[#525252] dark:text-slate-400 text-sm mt-2 text-center">
-              {isLogin ? 'Sign in to your Support Copilot account' : 'Join the next generation of L2 support'}
+              {isLogin ? 'Sign in to your EscalateAI account' : 'Join the next generation of L2 support'}
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-[#da1e28] text-xs font-medium text-center"
@@ -73,7 +73,7 @@ export const LoginPage = () => {
             )}
 
             {success && (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-[#24a148] text-xs font-medium text-center"
@@ -94,13 +94,13 @@ export const LoginPage = () => {
                   <label className="text-[10px] uppercase tracking-widest font-bold text-[#525252] dark:text-slate-400 ml-1">Username</label>
                   <div className="relative group">
                     <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#a8a8a8] dark:text-slate-500 group-focus-within:text-[#0f62fe] dark:group-focus-within:text-blue-500 transition-colors" />
-                    <input 
-                       type="text"
-                       required
-                       value={username}
-                       onChange={(e) => setUsername(e.target.value)}
-                       placeholder="johndoe"
-                       className="w-full bg-[#ffffff] dark:bg-slate-800 border border-[#c6c6c6] dark:border-slate-700 rounded-2xl py-3.5 pl-12 pr-4 text-[#161616] dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 text-sm outline-none focus:border-[#0f62fe] dark:focus:border-blue-500 transition-all"
+                    <input
+                      type="text"
+                      required
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="johndoe"
+                      className="w-full bg-[#ffffff] dark:bg-slate-800 border border-[#c6c6c6] dark:border-slate-700 rounded-2xl py-3.5 pl-12 pr-4 text-[#161616] dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 text-sm outline-none focus:border-[#0f62fe] dark:focus:border-blue-500 transition-all"
                     />
                   </div>
                 </motion.div>
@@ -111,7 +111,7 @@ export const LoginPage = () => {
               <label className="text-[10px] uppercase tracking-widest font-bold text-[#525252] dark:text-slate-400 ml-1">Email Address</label>
               <div className="relative group">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#a8a8a8] dark:text-slate-500 group-focus-within:text-[#0f62fe] dark:group-focus-within:text-blue-500 transition-colors" />
-                <input 
+                <input
                   type="email"
                   required
                   value={email}
@@ -126,7 +126,7 @@ export const LoginPage = () => {
               <label className="text-[10px] uppercase tracking-widest font-bold text-[#525252] dark:text-slate-400 ml-1">Password</label>
               <div className="relative group">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#a8a8a8] dark:text-slate-500 group-focus-within:text-[#0f62fe] dark:group-focus-within:text-blue-500 transition-colors" />
-                <input 
+                <input
                   type="password"
                   required
                   value={password}
@@ -155,7 +155,7 @@ export const LoginPage = () => {
           </form>
 
           <div className="mt-6 text-center">
-            <button 
+            <button
               onClick={() => {
                 setIsLogin(!isLogin)
                 setError('')

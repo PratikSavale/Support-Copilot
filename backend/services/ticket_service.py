@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any
+import uuid
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -118,7 +119,8 @@ class TicketService:
         await db.refresh(ticket)
 
         # Mark session as escalated.
-        session = await db.get(Session, session_id)
+        session_uuid = uuid.UUID(str(session_id)) if isinstance(session_id, str) else session_id
+        session = await db.get(Session, session_uuid)
         if session:
             session.status = "escalated"
             
@@ -198,10 +200,11 @@ class TicketService:
     async def update_ticket(
         self,
         db: AsyncSession,
-        ticket_id: str,
+        ticket_id: str | uuid.UUID,
         **kwargs: Any,
     ) -> Ticket | None:
-        ticket = await db.get(Ticket, ticket_id)
+        ticket_uuid = uuid.UUID(str(ticket_id)) if isinstance(ticket_id, str) else ticket_id
+        ticket = await db.get(Ticket, ticket_uuid)
         if not ticket:
             return None
         for key, value in kwargs.items():
@@ -211,25 +214,27 @@ class TicketService:
         await db.refresh(ticket)
         return ticket
 
-    async def sync_ticket_to_jira(self, db: AsyncSession, ticket_id: str) -> Ticket | None:
+    async def sync_ticket_to_jira(self, db: AsyncSession, ticket_id: str | uuid.UUID) -> Ticket | None:
         """Sync a single ticket's status from Jira."""
-        ticket = await db.get(Ticket, ticket_id)
+        ticket_uuid = uuid.UUID(str(ticket_id)) if isinstance(ticket_id, str) else ticket_id
+        ticket = await db.get(Ticket, ticket_uuid)
         if not ticket or not ticket.jira_issue_key:
             return ticket
 
-        await self.jira_client.sync_status(ticket_id, db)
+        await self.jira_client.sync_status(str(ticket_uuid), db)
         await db.refresh(ticket)
         return ticket
 
     async def add_comment_to_ticket(
         self,
         db: AsyncSession,
-        ticket_id: str,
+        ticket_id: str | uuid.UUID,
         comment_text: str,
         source: str = "copilot",
     ) -> dict[str, Any] | None:
         """Add a comment to a ticket and sync to Jira if applicable."""
-        ticket = await db.get(Ticket, ticket_id)
+        ticket_uuid = uuid.UUID(str(ticket_id)) if isinstance(ticket_id, str) else ticket_id
+        ticket = await db.get(Ticket, ticket_uuid)
         if not ticket:
             return None
 
@@ -239,25 +244,29 @@ class TicketService:
                 jira_comment = await self.jira_client.add_comment(
                     ticket.jira_issue_key, comment_text
                 )
-                # Update local jira_comments
-                if ticket.jira_comments is None:
-                    ticket.jira_comments = []
-                
-                # Append to list - SQLAlchemy JSONB change detection
-                comments = list(ticket.jira_comments)
-                comments.append({
-                    "id": jira_comment.get("id"),
-                    "body": comment_text,
-                    "author": jira_comment.get("author"),
-                    "created": jira_comment.get("created"),
-                    "source": source
-                })
-                ticket.jira_comments = comments
-                await db.flush()
             except Exception as exc:
                 logger.warning(f"Failed to sync comment to Jira for ticket {ticket_id}: {exc}")
 
-        return jira_comment
+        # Update local jira_comments (always, whether Jira sync succeeded or failed/skipped)
+        if ticket.jira_comments is None:
+            ticket.jira_comments = []
+        
+        from datetime import datetime, timezone
+        comments = list(ticket.jira_comments)
+        
+        comment_dict = {
+            "id": jira_comment.get("id") if (jira_comment and jira_comment.get("id")) else str(uuid.uuid4()),
+            "body": comment_text,
+            "author": jira_comment.get("author") if (jira_comment and jira_comment.get("author")) else "copilot-admin",
+            "created": jira_comment.get("created") if (jira_comment and jira_comment.get("created")) else datetime.now(timezone.utc).isoformat(),
+            "source": source
+        }
+        
+        comments.append(comment_dict)
+        ticket.jira_comments = comments
+        await db.flush()
+
+        return comment_dict
 
     async def list_tickets_with_jira_status(
         self,

@@ -36,14 +36,14 @@ export const RagGraphModal = ({ isOpen, onClose, message }: RagGraphModalProps) 
       position: { x: 400, y: 50 },
       data: {
         label: (
-          <div className="flex flex-col items-center gap-2 p-2 w-64">
-            <div className="bg-[#f4f4f4] p-2 rounded-full"><MessageSquare className="w-5 h-5 text-[#0f62fe]" /></div>
-            <span className="font-bold text-[#161616] text-sm text-center">User Query</span>
-            <span className="text-xs text-[#525252] truncate w-full text-center" title={userQuery}>"{userQuery}"</span>
+          <div className="flex flex-col items-center gap-2 p-2 w-64 bg-white dark:bg-slate-900 rounded-[10px] text-slate-900 dark:text-white transition-colors duration-300">
+            <div className="bg-slate-50 dark:bg-slate-950 p-2 rounded-full transition-colors"><MessageSquare className="w-5 h-5 text-[#0f62fe] dark:text-blue-400" /></div>
+            <span className="font-bold text-slate-900 dark:text-white text-sm text-center">User Query</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400 truncate w-full text-center" title={userQuery}>"{userQuery}"</span>
           </div>
         )
       },
-      style: { background: '#ffffff', border: '2px solid #0f62fe', borderRadius: '12px', width: '256px' }
+      style: { background: 'transparent', border: '2px solid #0f62fe', borderRadius: '12px', width: '256px', padding: 0 }
     });
 
     // 2. Vector Search
@@ -52,14 +52,14 @@ export const RagGraphModal = ({ isOpen, onClose, message }: RagGraphModalProps) 
       position: { x: 400, y: 200 },
       data: {
         label: (
-          <div className="flex flex-col items-center gap-2 p-2 w-48" title="Executing k-NN search against ChromaDB using BAAI/bge-small-en-v1.5 embeddings to find semantically similar documentation.">
-            <div className="bg-[#f4f4f4] p-2 rounded-full"><Search className="w-5 h-5 text-[#0043ce]" /></div>
-            <span className="font-bold text-[#161616] text-sm text-center">Semantic Search</span>
-            <span className="text-xs text-[#525252] text-center">Querying ChromaDB</span>
+          <div className="flex flex-col items-center gap-2 p-2 w-48 bg-white dark:bg-slate-900 rounded-[10px] text-slate-900 dark:text-white transition-colors duration-300" title="Executing k-NN search against ChromaDB using BAAI/bge-small-en-v1.5 embeddings to find semantically similar documentation.">
+            <div className="bg-slate-50 dark:bg-slate-950 p-2 rounded-full transition-colors"><Search className="w-5 h-5 text-[#0043ce] dark:text-indigo-400" /></div>
+            <span className="font-bold text-slate-900 dark:text-white text-sm text-center">Semantic Search</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400 text-center">Querying ChromaDB</span>
           </div>
         )
       },
-      style: { background: '#ffffff', border: '2px solid #0043ce', borderRadius: '12px', width: '192px' }
+      style: { background: 'transparent', border: '2px solid #0043ce', borderRadius: '12px', width: '192px', padding: 0 }
     });
     edges.push({ id: 'e-uq-vs', source: 'user_query', target: 'vector_search', animated: true, style: edgeStyle, markerEnd });
 
@@ -73,13 +73,13 @@ export const RagGraphModal = ({ isOpen, onClose, message }: RagGraphModalProps) 
         position: { x: 400, y: 350 },
         data: {
           label: (
-            <div className="flex flex-col items-center gap-2 p-2 w-48">
-              <div className="bg-[#fff0f1] p-2 rounded-full"><Database className="w-5 h-5 text-[#da1e28]" /></div>
-              <span className="font-bold text-[#161616] text-sm text-center">No Context Found</span>
+            <div className="flex flex-col items-center gap-2 p-2 w-48 bg-white dark:bg-slate-900 rounded-[10px] text-slate-900 dark:text-white transition-colors duration-300">
+              <div className="bg-[#fff0f1] dark:bg-rose-955/20 p-2 rounded-full"><Database className="w-5 h-5 text-[#da1e28] dark:text-rose-400" /></div>
+              <span className="font-bold text-slate-900 dark:text-white text-sm text-center">No Context Found</span>
             </div>
           )
         },
-        style: { background: '#ffffff', border: '2px solid #da1e28', borderRadius: '12px', width: '200px' }
+        style: { background: 'transparent', border: '2px solid #da1e28', borderRadius: '12px', width: '200px', padding: 0 }
       });
       edges.push({ id: 'e-vs-nc', source: 'vector_search', target: 'no_chunks', style: edgeStyle, markerEnd });
     } else {
@@ -91,19 +91,19 @@ export const RagGraphModal = ({ isOpen, onClose, message }: RagGraphModalProps) 
           position: { x: xStart + (idx * 320), y: 350 },
           data: {
             label: (
-              <div className="flex flex-col gap-2 p-3 w-[280px] text-left">
+              <div className="flex flex-col gap-2 p-3 w-[280px] text-left bg-white dark:bg-slate-900 rounded-[10px] text-slate-900 dark:text-white transition-colors duration-300">
                 <div className="flex items-center gap-2 mb-1">
-                  {isFallback ? <BrainCircuit className="w-4 h-4 text-[#8a3ffc]" /> : <FileText className="w-4 h-4 text-[#24a148]" />}
-                  <span className="font-bold text-[#161616] text-xs truncate uppercase tracking-wider">{isFallback ? "LLM Base Knowledge" : "Document Context"}</span>
+                  {isFallback ? <BrainCircuit className="w-4 h-4 text-[#8a3ffc] dark:text-purple-400" /> : <FileText className="w-4 h-4 text-[#24a148] dark:text-emerald-450" />}
+                  <span className="font-bold text-slate-900 dark:text-white text-xs truncate uppercase tracking-wider">{isFallback ? "LLM Base Knowledge" : "Document Context"}</span>
                 </div>
-                <div className="text-[11px] font-medium text-[#0f62fe] truncate bg-[#e5f0ff] px-2 py-1 rounded">{source.title}</div>
-                <div className="text-[10px] text-[#525252] mt-2 whitespace-pre-wrap break-all overflow-x-hidden w-full max-h-[150px] overflow-y-auto bg-[#f4f4f4] p-2 rounded border border-[#e0e0e0] font-mono leading-relaxed text-left" style={{ textAlign: 'left', wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
+                <div className="text-[11px] font-medium text-[#0f62fe] dark:text-blue-400 truncate bg-[#e5f0ff] dark:bg-blue-900/20 px-2 py-1 rounded transition-colors">{source.title}</div>
+                <div className="text-[10px] text-slate-650 dark:text-slate-350 mt-2 whitespace-pre-wrap break-all overflow-x-hidden w-full max-h-[150px] overflow-y-auto bg-slate-50 dark:bg-slate-950 p-2 rounded border border-slate-200 dark:border-slate-800 font-mono leading-relaxed text-left transition-colors" style={{ textAlign: 'left', wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
                   {source.chunk_excerpt}
                 </div>
               </div>
             )
           },
-          style: { background: '#ffffff', border: `2px solid ${isFallback ? '#8a3ffc' : '#24a148'}`, borderRadius: '12px', padding: 0, width: '280px' }
+          style: { background: 'transparent', border: `2px solid ${isFallback ? '#8a3ffc' : '#24a148'}`, borderRadius: '12px', padding: 0, width: '280px' }
         });
         edges.push({ id: `e-vs-${nId}`, source: 'vector_search', target: nId, animated: true, style: { stroke: isFallback ? '#8a3ffc' : '#24a148', strokeWidth: 2 }, markerEnd: { type: MarkerType.ArrowClosed, color: isFallback ? '#8a3ffc' : '#24a148' } });
         
@@ -118,14 +118,14 @@ export const RagGraphModal = ({ isOpen, onClose, message }: RagGraphModalProps) 
       position: { x: 400, y: 600 },
       data: {
         label: (
-          <div className="flex flex-col items-center gap-2 p-2 w-48" title="Synthesizing the final answer using the Gemini LLM, strictly grounded in the provided context chunks.">
-            <div className="bg-[#f4f4f4] p-2 rounded-full"><BrainCircuit className="w-5 h-5 text-[#8a3ffc]" /></div>
-            <span className="font-bold text-[#161616] text-sm text-center">Gemini 2.0 Flash</span>
-            <span className="text-xs text-[#525252] text-center">Synthesizing Answer</span>
+          <div className="flex flex-col items-center gap-2 p-2 w-48 bg-white dark:bg-slate-900 rounded-[10px] text-slate-900 dark:text-white transition-colors duration-300" title="Synthesizing the final answer using the Gemini LLM, strictly grounded in the provided context chunks.">
+            <div className="bg-slate-50 dark:bg-slate-950 p-2 rounded-full transition-colors"><BrainCircuit className="w-5 h-5 text-[#8a3ffc] dark:text-purple-400" /></div>
+            <span className="font-bold text-slate-900 dark:text-white text-sm text-center">Gemini 2.0 Flash</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400 text-center">Synthesizing Answer</span>
           </div>
         )
       },
-      style: { background: '#ffffff', border: '2px solid #8a3ffc', borderRadius: '12px', width: '192px' }
+      style: { background: 'transparent', border: '2px solid #8a3ffc', borderRadius: '12px', width: '192px', padding: 0 }
     });
 
     if (sources.length === 0) {
@@ -138,13 +138,13 @@ export const RagGraphModal = ({ isOpen, onClose, message }: RagGraphModalProps) 
       position: { x: 400, y: 750 },
       data: {
         label: (
-          <div className="flex flex-col items-center gap-2 p-2 w-64" title="The final response delivered to the user UI.">
-            <span className="font-bold text-[#161616] text-sm text-center">Final AI Response</span>
-            <span className="text-xs text-[#525252] truncate w-full text-center">"{message.content.slice(0, 60)}..."</span>
+          <div className="flex flex-col items-center gap-2 p-2 w-64 bg-white dark:bg-slate-900 rounded-[10px] text-slate-900 dark:text-white transition-colors duration-300" title="The final response delivered to the user UI.">
+            <span className="font-bold text-slate-900 dark:text-white text-sm text-center">Final AI Response</span>
+            <span className="text-xs text-slate-550 dark:text-slate-400 truncate w-full text-center">"{message.content.slice(0, 60)}..."</span>
           </div>
         )
       },
-      style: { background: '#ffffff', border: '2px solid #161616', borderRadius: '12px', width: '256px' }
+      style: { background: 'transparent', border: '2px solid #475569', borderRadius: '12px', width: '256px', padding: 0 }
     });
     edges.push({ id: 'e-llm-fa', source: 'llm', target: 'final_answer', animated: true, style: edgeStyle, markerEnd });
 
@@ -168,29 +168,29 @@ export const RagGraphModal = ({ isOpen, onClose, message }: RagGraphModalProps) 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
-          className="bg-[#f4f4f4] w-full max-w-6xl h-[85vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-[#e0e0e0]"
+          className="bg-slate-50 dark:bg-slate-950 w-full max-w-6xl h-[85vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 dark:border-slate-800 transition-colors duration-300"
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-[#e0e0e0]">
+          <div className="flex items-center justify-between px-6 py-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 transition-colors duration-300">
             <div className="flex items-center gap-3">
-              <div className="bg-[#e5f0ff] p-2 rounded-lg">
-                <BrainCircuit className="w-5 h-5 text-[#0f62fe]" />
+              <div className="bg-[#e5f0ff] dark:bg-blue-950/30 p-2 rounded-lg transition-colors">
+                <BrainCircuit className="w-5 h-5 text-[#0f62fe] dark:text-blue-400" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-[#161616]">RAG Pipeline Visualization</h3>
-                <p className="text-xs text-[#525252]">Retrieval-Augmented Generation context map for this response</p>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">RAG Pipeline Visualization</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-450">Retrieval-Augmented Generation context map for this response</p>
               </div>
             </div>
             <button 
               onClick={onClose}
-              className="p-2 hover:bg-[#f4f4f4] rounded-full transition-colors"
+              className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-650 dark:text-slate-350"
             >
-              <X className="w-5 h-5 text-[#161616]" />
+              <X className="w-5 h-5" />
             </button>
           </div>
 
           {/* Graph Canvas */}
-          <div className="flex-1 w-full bg-[#f4f4f4] relative">
+          <div className="flex-1 w-full bg-slate-50 dark:bg-slate-950 relative transition-colors duration-300">
             <ReactFlow 
               nodes={nodes} 
               edges={edges} 
@@ -201,8 +201,8 @@ export const RagGraphModal = ({ isOpen, onClose, message }: RagGraphModalProps) 
               defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
               attributionPosition="bottom-right"
             >
-              <Background color="#c6c6c6" gap={16} />
-              <Controls className="bg-white border-[#e0e0e0] fill-[#161616]" />
+              <Background color="#cbd5e1" gap={16} className="opacity-40 dark:opacity-10" />
+              <Controls className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 dark:text-white" />
             </ReactFlow>
           </div>
         </motion.div>

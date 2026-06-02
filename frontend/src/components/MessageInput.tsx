@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import {
   Check,
-  CheckCircle2,
   FileText,
   Image as ImageIcon,
   Loader2,
@@ -281,7 +280,9 @@ export const MessageInput = ({ onSendMessage, onStop, disabled, isStreaming }: M
                       </div>
                     )}
                     {att.status === 'error' && (
-                      <AlertCircle className="w-3.5 h-3.5 text-rose-500" title={att.error} />
+                      <div title={att.error}>
+                        <AlertCircle className="w-3.5 h-3.5 text-rose-500" />
+                      </div>
                     )}
                     
                     <button

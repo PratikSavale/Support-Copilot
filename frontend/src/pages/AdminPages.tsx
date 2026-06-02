@@ -81,55 +81,54 @@ const ManualEscalateModal = ({ onClose }: { onClose: () => void }) => {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
-        className="absolute inset-0 bg-[#161616]/90 backdrop-blur-md"
+        className="absolute inset-0 bg-[#161616]/60 dark:bg-[#161616]/90 backdrop-blur-md"
       />
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="relative w-full max-w-lg bg-[#262626] border border-[#393939] rounded-3xl p-8 space-y-8 shadow-2xl"
+        className="relative w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 space-y-8 shadow-2xl transition-colors duration-300"
       >
         <div className="flex items-center gap-4">
           <div className="p-3 rounded-2xl bg-[#0f62fe]/20">
-            <ShieldAlert className="w-6 h-6 text-[#0f62fe]" />
+            <ShieldAlert className="w-6 h-6 text-[#0f62fe] dark:text-blue-450" />
           </div>
           <div>
-            <h3 className="text-xl font-bold text-[#f4f4f4]">Manual Escalation</h3>
-            <p className="text-xs text-[#c6c6c6]">Convert a chat session into a Jira ticket.</p>
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white">Manual Escalation</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Convert a chat session into a Jira ticket.</p>
           </div>
         </div>
 
         {isLoadingData ? (
           <div className="py-12 flex justify-center">
-            <Loader2 className="w-8 h-8 text-[#0f62fe] animate-spin" />
+            <Loader2 className="w-8 h-8 text-[#0f62fe] dark:text-blue-500 animate-spin" />
           </div>
         ) : (
           <div className="space-y-6">
             <div className="space-y-2">
-              <label className="text-[10px] uppercase tracking-widest font-bold text-[#c6c6c6] ml-1">Select Session</label>
+              <label className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 ml-1">Select Session</label>
               <select
                 value={selectedSession}
                 onChange={(e) => setSelectedSession(e.target.value)}
-                className="w-full bg-[#161616] border border-[#393939] rounded-xl py-3 px-4 text-sm text-[#f4f4f4] focus:outline-none focus:border-[#0f62fe]"
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl py-3 px-4 text-sm text-slate-850 dark:text-white focus:outline-none focus:border-[#0f62fe] dark:focus:border-blue-500"
               >
                 <option value="">Choose a session...</option>
                 {sessions.map(s => (
-                  <option key={s.id} value={s.id}>{s.title || 'Untitled'} ({s.id.slice(0,8)})</option>
+                  <option key={s.id} value={s.id}>{s.title || 'Untitled'} ({s.id.slice(0, 8)})</option>
                 ))}
               </select>
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] uppercase tracking-widest font-bold text-[#c6c6c6] ml-1">Jira Issue Type</label>
+              <label className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 ml-1">Jira Issue Type</label>
               <div className="grid grid-cols-2 gap-3">
                 {issueTypes.map(type => (
                   <button
                     key={type.id}
                     onClick={() => setSelectedIssueType(type.name)}
-                    className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
-                      selectedIssueType === type.name 
-                        ? 'bg-[#0f62fe]/10 border-[#0f62fe] text-[#0f62fe]' 
-                        : 'bg-[#161616] border-[#393939] text-[#c6c6c6] hover:border-[#525252]'
-                    }`}
+                    className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${selectedIssueType === type.name
+                        ? 'bg-[#0f62fe]/10 dark:bg-blue-500/10 border-[#0f62fe] dark:border-blue-500 text-[#0f62fe] dark:text-blue-400 font-bold shadow-sm'
+                        : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-850 text-slate-650 dark:text-slate-350 hover:border-slate-350 dark:hover:border-slate-750'
+                      }`}
                   >
                     {type.iconUrl && <img src={type.iconUrl} alt="" className="w-4 h-4" />}
                     <span className="text-xs font-bold">{type.name}</span>
@@ -143,7 +142,7 @@ const ManualEscalateModal = ({ onClose }: { onClose: () => void }) => {
         <div className="flex items-center gap-4 pt-4">
           <button
             onClick={onClose}
-            className="flex-1 py-3 text-xs font-bold uppercase tracking-widest text-[#c6c6c6] hover:text-[#f4f4f4] transition-colors"
+            className="flex-1 py-3 text-xs font-bold uppercase tracking-widest text-slate-550 dark:text-slate-450 hover:text-slate-850 dark:hover:text-white transition-colors"
           >
             Cancel
           </button>
@@ -168,7 +167,7 @@ export const AdminDashboard = () => {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {[1, 2, 3, 4, 5, 6].map((i) => (
-          <div key={i} className="h-40 rounded-2xl bg-[#262626] border border-[#393939] animate-pulse" />
+          <div key={i} className="h-40 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 animate-pulse" />
         ))}
       </div>
     )
@@ -232,8 +231,8 @@ export const AdminDashboard = () => {
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-1">
-        <h2 className="text-3xl font-bold tracking-tight text-[#f4f4f4]">System Overview</h2>
-        <p className="text-sm text-[#c6c6c6] font-medium">Real-time performance metrics and support activity.</p>
+        <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">System Overview</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Real-time performance metrics and support activity.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -247,11 +246,11 @@ export const AdminDashboard = () => {
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="h-64 rounded-2xl bg-[#262626] border border-[#393939] p-8 flex flex-col justify-end gap-4"
+          className="h-64 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 flex flex-col justify-end gap-4 transition-colors duration-300"
         >
           <div className="flex flex-col gap-1">
-            <h3 className="text-lg font-bold text-[#f4f4f4]">Activity Timeline</h3>
-            <p className="text-sm text-[#c6c6c6]">Knowledge ingestion and query volume trends.</p>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Activity Timeline</h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Knowledge ingestion and query volume trends.</p>
           </div>
           <div className="h-24 w-full flex items-end gap-1">
             {[...Array(40)].map((_, i) => (
@@ -288,39 +287,39 @@ const AddSourceForm = () => {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="p-8 rounded-2xl bg-[#262626] border border-[#393939] space-y-6"
+      className="p-8 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-6 transition-colors duration-300"
     >
       <div className="flex items-center gap-3">
         <div className="p-2 rounded-xl bg-[#0f62fe]/20">
-          <Plus className="w-5 h-5 text-[#0f62fe]" />
+          <Plus className="w-5 h-5 text-[#0f62fe] dark:text-blue-450" />
         </div>
-        <h3 className="text-xl font-bold text-[#f4f4f4]">Add Knowledge Source</h3>
+        <h3 className="text-xl font-bold text-slate-900 dark:text-white">Add Knowledge Source</h3>
       </div>
 
       <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="flex flex-col gap-2">
-          <label className="text-[10px] uppercase tracking-widest font-bold text-[#c6c6c6] ml-1">Documentation URL</label>
+          <label className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 ml-1">Documentation URL</label>
           <div className="relative group">
-            <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8d8d8d] group-focus-within:text-[#0f62fe] transition-colors" />
+            <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-[#0f62fe] transition-colors" />
             <input
               type="url"
               value={url}
               onChange={(e) => { setUrl(e.target.value); clearError() }}
               placeholder="https://docs.example.com/guide"
               required
-              className="w-full bg-[#161616] border border-[#393939] rounded-xl py-3 pl-12 pr-4 text-sm text-[#f4f4f4] focus:outline-none focus:border-[#0f62fe] focus:bg-[#262626] transition-all"
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-3 pl-12 pr-4 text-sm text-slate-850 dark:text-white focus:outline-none focus:border-[#0f62fe] dark:focus:border-blue-500 focus:bg-slate-100 dark:focus:bg-slate-900 transition-all"
             />
           </div>
         </div>
 
         <div className="flex flex-col gap-2">
-          <label className="text-[10px] uppercase tracking-widest font-bold text-[#c6c6c6] ml-1">Friendly Title (Optional)</label>
+          <label className="text-[10px] uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500 ml-1">Friendly Title (Optional)</label>
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Troubleshooting Guide"
-            className="w-full bg-[#161616] border border-[#393939] rounded-xl py-3 px-4 text-sm text-[#f4f4f4] focus:outline-none focus:border-[#0f62fe] focus:bg-[#262626] transition-all"
+            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-3 px-4 text-sm text-slate-850 dark:text-white focus:outline-none focus:border-[#0f62fe] dark:focus:border-blue-500 focus:bg-slate-100 dark:focus:bg-slate-900 transition-all"
           />
         </div>
 
@@ -353,7 +352,7 @@ const SourceList = () => {
     return (
       <div className="space-y-4">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-20 rounded-2xl bg-[#262626] border border-[#393939] animate-pulse" />
+          <div key={i} className="h-20 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 animate-pulse" />
         ))}
       </div>
     )
@@ -361,13 +360,13 @@ const SourceList = () => {
 
   if (knowledgeSources.length === 0) {
     return (
-      <div className="p-20 rounded-2xl bg-[#262626] border border-[#393939] flex flex-col items-center justify-center text-center gap-4">
-        <div className="w-12 h-12 rounded-xl bg-[#161616] border border-[#393939] flex items-center justify-center">
-          <BookOpen className="w-6 h-6 text-[#8d8d8d]" />
+      <div className="p-20 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center text-center gap-4 transition-colors duration-300">
+        <div className="w-12 h-12 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 flex items-center justify-center">
+          <BookOpen className="w-6 h-6 text-slate-400 dark:text-slate-500" />
         </div>
         <div className="space-y-1">
-          <h3 className="text-[#f4f4f4] font-medium">No Knowledge Sources</h3>
-          <p className="text-[#c6c6c6] text-sm max-w-xs">Add your first documentation URL above to start building your AI's expertise.</p>
+          <h3 className="text-slate-900 dark:text-white font-medium">No Knowledge Sources</h3>
+          <p className="text-slate-500 dark:text-slate-450 text-sm max-w-xs">Add your first documentation URL above to start building your AI's expertise.</p>
         </div>
       </div>
     )
@@ -376,33 +375,33 @@ const SourceList = () => {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between px-2">
-        <h3 className="text-sm font-bold text-[#c6c6c6] uppercase tracking-widest">Active Sources ({knowledgeSources.length})</h3>
+        <h3 className="text-sm font-bold text-slate-450 dark:text-slate-500 uppercase tracking-widest">Active Sources ({knowledgeSources.length})</h3>
       </div>
 
       <div className="space-y-3">
         {knowledgeSources.map((source) => (
-          <motion.div 
+          <motion.div
             layout
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            key={source.id} 
-            className="p-5 rounded-2xl bg-[#262626] border border-[#393939] flex items-center justify-between group hover:bg-[#393939] transition-all"
+            key={source.id}
+            className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-between group hover:bg-slate-50/50 dark:hover:bg-slate-850/55 transition-all duration-300"
           >
             <div className="flex items-center gap-4 flex-1 min-w-0">
-              <div className="w-10 h-10 rounded-xl bg-[#161616] flex items-center justify-center flex-shrink-0">
-                <Globe className="w-5 h-5 text-[#c6c6c6] group-hover:text-[#0f62fe] transition-colors" />
+              <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 flex items-center justify-center flex-shrink-0">
+                <Globe className="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-[#0f62fe] dark:group-hover:text-blue-400 transition-colors" />
               </div>
               <div className="flex flex-col gap-0.5 min-w-0">
                 <div className="flex items-center gap-3">
-                  <h4 className="text-[#f4f4f4] font-bold truncate">{source.title || source.url}</h4>
+                  <h4 className="text-slate-900 dark:text-white font-bold truncate">{source.title || source.url}</h4>
                   <StatusBadge status={source.status} />
                 </div>
-                <p className="text-xs text-[#8d8d8d] truncate font-mono">{source.url}</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 truncate font-mono">{source.url}</p>
                 <div className="flex items-center gap-4 mt-2">
-                  <span className="text-[10px] text-[#c6c6c6] uppercase tracking-widest font-bold">
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest font-bold">
                     {source.chunk_count} Chunks
                   </span>
-                  <span className="text-[10px] text-[#c6c6c6] uppercase tracking-widest font-bold">
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest font-bold">
                     Type: {source.source_type}
                   </span>
                 </div>
@@ -414,8 +413,8 @@ const SourceList = () => {
                       const max = source.max_pages || 200;
                       const isEmbedding = crawled >= max;
                       const percent = isEmbedding ? 95 : Math.min(90, (crawled / max) * 90);
-                      const statusText = isEmbedding 
-                        ? "Generating Embeddings & Indexing..." 
+                      const statusText = isEmbedding
+                        ? "Generating Embeddings & Indexing..."
                         : "Crawling & Ingesting Pages...";
 
                       return (
@@ -430,7 +429,7 @@ const SourceList = () => {
                             </span>
                           </div>
                           <div className="h-1.5 w-full bg-[#161616] border border-[#393939] rounded-full overflow-hidden">
-                            <motion.div 
+                            <motion.div
                               initial={{ width: 0 }}
                               animate={{ width: `${percent}%` }}
                               transition={{ duration: 0.5, ease: "easeOut" }}
@@ -445,7 +444,7 @@ const SourceList = () => {
 
                 {source.status === 'pending' && (
                   <div className="mt-3 space-y-1.5 min-w-[250px] max-w-md">
-                    <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-[#8d8d8d]">
+                    <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
                       <Loader2 className="w-3 h-3 animate-spin" />
                       Queueing for Ingestion...
                     </div>
@@ -458,21 +457,21 @@ const SourceList = () => {
               <button
                 onClick={() => reindexSource(source.id)}
                 disabled={isRefreshing === source.id}
-                className="p-2.5 rounded-xl bg-[#161616] border border-[#393939] text-[#c6c6c6] hover:text-[#f4f4f4] hover:bg-[#393939] transition-all disabled:opacity-50"
+                className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-205 dark:border-slate-850 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-all disabled:opacity-50"
                 title="Re-index Source"
               >
                 <RefreshCw className={`w-4 h-4 ${isRefreshing === source.id ? 'animate-spin' : ''}`} />
               </button>
               <button
                 onClick={() => window.open(source.url, '_blank')}
-                className="p-2.5 rounded-xl bg-[#161616] border border-[#393939] text-[#c6c6c6] hover:text-[#f4f4f4] hover:bg-[#393939] transition-all"
+                className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-205 dark:border-slate-850 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
                 title="Open Original Source"
               >
                 <ExternalLink className="w-4 h-4" />
               </button>
               <button
                 onClick={() => deleteKnowledgeSource(source.id)}
-                className="p-2.5 rounded-xl bg-[#161616] border border-[#393939] text-[#da1e28]/70 hover:text-[#da1e28] hover:bg-[#da1e28]/20 transition-all"
+                className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-205 dark:border-slate-850 text-rose-500/70 dark:text-rose-450/70 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-all"
                 title="Delete Source"
               >
                 <Trash2 className="w-4 h-4" />
@@ -490,8 +489,8 @@ export const KnowledgePage = () => {
   return (
     <div className="space-y-12">
       <div className="flex flex-col gap-1">
-        <h2 className="text-3xl font-bold tracking-tight text-[#f4f4f4]">Knowledge Base</h2>
-        <p className="text-sm text-[#c6c6c6] font-medium">Curate and maintain the data that powers your AI's intelligence.</p>
+        <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Knowledge Base</h2>
+        <p className="text-sm text-slate-550 dark:text-slate-400 font-medium">Curate and maintain the data that powers your AI's intelligence.</p>
       </div>
 
       <AddSourceForm />
@@ -507,41 +506,41 @@ const TicketFilters = () => {
 
   return (
     <div className="flex flex-wrap items-center gap-4">
-      <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#262626] border border-[#393939]">
-        <Filter className="w-3.5 h-3.5 text-[#c6c6c6]" />
+      <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 transition-colors duration-300">
+        <Filter className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
         <select
           value={filterStatus || ''}
           onChange={(e) => setFilterStatus(e.target.value || null)}
-          className="bg-transparent text-xs font-bold text-[#c6c6c6] focus:outline-none cursor-pointer uppercase tracking-widest"
+          className="bg-transparent text-xs font-bold text-slate-650 dark:text-slate-350 focus:outline-none cursor-pointer uppercase tracking-widest"
         >
-          <option value="">All Statuses</option>
-          <option value="open">Open</option>
-          <option value="in_progress">In Progress</option>
-          <option value="resolved">Resolved</option>
+          <option value="" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-205">All Statuses</option>
+          <option value="open" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-205">Open</option>
+          <option value="in_progress" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-205">In Progress</option>
+          <option value="resolved" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-205">Resolved</option>
         </select>
       </div>
 
-      <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#262626] border border-[#393939]">
-        <ShieldAlert className="w-3.5 h-3.5 text-[#c6c6c6]" />
+      <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 transition-colors duration-300">
+        <ShieldAlert className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
         <select
           value={filterSeverity || ''}
           onChange={(e) => setFilterSeverity(e.target.value || null)}
-          className="bg-transparent text-xs font-bold text-[#c6c6c6] focus:outline-none cursor-pointer uppercase tracking-widest"
+          className="bg-transparent text-xs font-bold text-slate-650 dark:text-slate-350 focus:outline-none cursor-pointer uppercase tracking-widest"
         >
-          <option value="">All Severities</option>
-          <option value="critical">Critical</option>
-          <option value="high">High</option>
-          <option value="medium">Medium</option>
-          <option value="low">Low</option>
+          <option value="" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-205">All Severities</option>
+          <option value="critical" className="bg-white dark:bg-slate-900 text-slate-850 dark:text-rose-400">Critical</option>
+          <option value="high" className="bg-white dark:bg-slate-900 text-slate-850 dark:text-orange-400">High</option>
+          <option value="medium" className="bg-white dark:bg-slate-900 text-slate-850 dark:text-blue-400">Medium</option>
+          <option value="low" className="bg-white dark:bg-slate-900 text-slate-850 dark:text-slate-405">Low</option>
         </select>
       </div>
 
       <div className="flex-1 min-w-[200px] relative group">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8d8d8d] group-focus-within:text-[#0f62fe] transition-colors" />
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500 group-focus-within:text-[#0f62fe] transition-colors" />
         <input
           type="text"
           placeholder="Search chats by summary or ID..."
-          className="w-full bg-[#161616] border border-[#393939] rounded-xl py-2 pl-12 pr-4 text-xs text-[#f4f4f4] focus:outline-none focus:border-[#0f62fe] focus:bg-[#262626] transition-all"
+          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-2 pl-12 pr-4 text-xs text-slate-850 dark:text-white focus:outline-none focus:border-[#0f62fe] dark:focus:border-blue-500 focus:bg-slate-100 dark:focus:bg-slate-900 transition-all"
         />
       </div>
     </div>
@@ -556,7 +555,7 @@ const TicketTable = () => {
     return (
       <div className="space-y-3">
         {[1, 2, 3, 4, 5].map((i) => (
-          <div key={i} className="h-16 rounded-xl bg-[#262626] border border-[#393939] animate-pulse" />
+          <div key={i} className="h-16 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 animate-pulse" />
         ))}
       </div>
     )
@@ -564,68 +563,68 @@ const TicketTable = () => {
 
   if (tickets.length === 0) {
     return (
-      <div className="p-20 rounded-2xl bg-[#262626] border border-[#393939] flex flex-col items-center justify-center text-center gap-4">
-        <div className="w-12 h-12 rounded-xl bg-[#161616] border border-[#393939] flex items-center justify-center">
-          <Inbox className="w-6 h-6 text-[#8d8d8d]" />
+      <div className="p-20 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center text-center gap-4 transition-colors duration-300">
+        <div className="w-12 h-12 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 flex items-center justify-center">
+          <Inbox className="w-6 h-6 text-slate-400 dark:text-slate-500" />
         </div>
         <div className="space-y-1">
-          <h3 className="text-[#f4f4f4] font-medium">No Chats Found</h3>
-          <p className="text-[#c6c6c6] text-sm max-w-xs">No support requests match your current filters.</p>
+          <h3 className="text-slate-900 dark:text-white font-medium">No Chats Found</h3>
+          <p className="text-slate-500 dark:text-slate-450 text-sm max-w-xs">No support requests match your current filters.</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="rounded-2xl border border-[#393939] overflow-hidden">
+    <div className="rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900 transition-colors duration-300">
       <table className="w-full text-left border-collapse">
-        <thead className="bg-[#262626]">
+        <thead className="bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
           <tr>
-            <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-bold text-[#c6c6c6]">Issue</th>
-            <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-bold text-[#c6c6c6]">Severity</th>
-            <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-bold text-[#c6c6c6]">Status</th>
-            <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-bold text-[#c6c6c6]">Created</th>
+            <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400">Issue</th>
+            <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400">Severity</th>
+            <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400">Status</th>
+            <th className="px-6 py-4 text-[10px] uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400">Created</th>
             <th className="px-6 py-4 text-right"></th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#393939]">
+        <tbody className="divide-y divide-slate-100 dark:divide-slate-850">
           {tickets.map((ticket) => (
-            <motion.tr 
+            <motion.tr
               key={ticket.id}
               onClick={() => openTicketDetail(ticket)}
-              className="hover:bg-[#393939] cursor-pointer transition-colors group"
+              className="hover:bg-slate-50/50 dark:hover:bg-slate-850/50 cursor-pointer transition-colors group"
             >
               <td className="px-6 py-4">
                 <div className="flex flex-col gap-0.5 max-w-md">
-                  <span className="text-xs font-bold text-[#f4f4f4] group-hover:text-white transition-colors truncate">
+                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100 group-hover:text-[#0f62fe] dark:group-hover:text-blue-450 transition-colors truncate">
                     {ticket.summary}
                   </span>
-                  <span className="text-[10px] text-[#8d8d8d] uppercase tracking-widest font-bold">
+                  <span className="text-[10px] text-slate-450 dark:text-slate-500 uppercase tracking-widest font-bold">
                     {ticket.jira_issue_key || ticket.id.slice(0, 8)}
                   </span>
                 </div>
               </td>
               <td className="px-6 py-4">
                 <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border
-                  ${ticket.severity === 'critical' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
-                    ticket.severity === 'high' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' :
-                      'bg-blue-500/10 text-blue-400 border-blue-500/20'}`}
+                  ${ticket.severity === 'critical' ? 'bg-rose-500/10 text-rose-550 border-rose-500/20' :
+                    ticket.severity === 'high' ? 'bg-orange-500/10 text-orange-550 border-orange-500/20' :
+                      'bg-blue-500/10 text-blue-550 border-blue-500/20'}`}
                 >
                   {ticket.severity}
                 </span>
               </td>
               <td className="px-6 py-4">
-                <span className="text-[10px] text-[#c6c6c6] font-bold uppercase tracking-widest">
+                <span className="text-[10px] text-slate-650 dark:text-slate-350 font-bold uppercase tracking-widest">
                   {ticket.status}
                 </span>
               </td>
               <td className="px-6 py-4">
-                <span className="text-[10px] text-[#8d8d8d] font-bold uppercase tracking-widest">
+                <span className="text-[10px] text-slate-450 dark:text-slate-500 font-bold uppercase tracking-widest">
                   {new Date(ticket.created_at).toLocaleDateString()}
                 </span>
               </td>
               <td className="px-6 py-4 text-right">
-                <ChevronRight className="w-4 h-4 text-[#393939] group-hover:text-[#0f62fe] group-hover:translate-x-1 transition-all inline-block" />
+                <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-700 group-hover:text-[#0f62fe] dark:group-hover:text-blue-400 group-hover:translate-x-1 transition-all inline-block" />
               </td>
             </motion.tr>
           ))}
@@ -643,8 +642,8 @@ export const TicketsPage = () => {
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-1">
-        <h2 className="text-3xl font-bold tracking-tight text-[#f4f4f4]">Chat Oversight</h2>
-        <p className="text-sm text-[#c6c6c6] font-medium">Review, track, and manage escalated support requests.</p>
+        <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Chat Oversight</h2>
+        <p className="text-sm text-slate-550 dark:text-slate-400 font-medium">Review, track, and manage escalated support requests.</p>
       </div>
 
       <div className="space-y-6">
